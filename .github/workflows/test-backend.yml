@@ -3,19 +3,19 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/backend/**'
-      - 'packages/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/test-backend.yml'
+      - "apps/backend/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/test-backend.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'apps/backend/**'
-      - 'packages/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/test-backend.yml'
+      - "apps/backend/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/test-backend.yml"
 
 env:
   MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
@@ -51,8 +51,8 @@ jobs:
       - name: Use Node.js from .node-version
         uses: actions/setup-node@v3
         with:
-          node-version-file: '.node-version'
-          cache: 'pnpm'
+          node-version-file: ".node-version"
+          cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Create empty .env file
@@ -63,3 +63,23 @@ jobs:
         run: docker compose exec mariadb mysqladmin --silent --wait=30 -u${MYSQL_USER} -p${MYSQL_PASSWORD} ping
       - name: Run tests
         run: pnpm --filter @tayttopaikka/backend test
+        env:
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          REDIS_VOLUME_NAME: redis-volume
+          REDIS_HOST: redis://localhost
+          REDIS_PORT: 6379
+          REDIS_USER: blenderi
+          REDIS_PASSWORD: pass
+          TRANSACTIONAL_FROM_EMAIL: no-reply@tayttopaikka.fi
+          APPLICATION_URI: https://localhost:3000
+          JWT_SECRET: dontuseme
+          TURNSTILE_SECRET: jaskajokunen
+          SCW_ACCESS_KEY: empty
+          SCW_SECRET_KEY: empty
+          SCW_DEFAULT_ORGANIZATION_ID: empty
+          SCW_DEFAULT_PROJECT_ID: empty
