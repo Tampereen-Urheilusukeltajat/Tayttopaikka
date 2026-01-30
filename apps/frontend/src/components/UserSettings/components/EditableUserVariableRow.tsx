@@ -8,7 +8,6 @@ type InputField = {
 };
 
 type EditableUserVariableRowProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: any;
   fields: InputField[];
   disableSaving: boolean;

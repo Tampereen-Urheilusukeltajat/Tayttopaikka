@@ -12,7 +12,6 @@ type UserPropertiesFormProps = {
   editingEmail: boolean;
   editingPhone: boolean;
   editingNewPassword: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: any;
   handleSubmit: () => void;
   handleReset: () => void;
@@ -31,7 +30,6 @@ type UserVariableRowProps = {
 
 type NewPasswordRowProps = {
   disableSaving: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: any;
   changeEditingStatus: () => void;
   resetFields: () => void;

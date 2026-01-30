@@ -171,6 +171,7 @@ export const DivingCylinderSetList = (): JSX.Element => {
     [divingCylinderSets],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const DivingCylinderTable = useReactTable({
     columns: tableColumns,
     data: tableCylinders,

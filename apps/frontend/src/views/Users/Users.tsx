@@ -73,6 +73,7 @@ export const UsersPage: React.FC = () => {
     [updateUserRoles],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const roleTable = useReactTable({
     columns: roleTableColumns,
     data: roles,

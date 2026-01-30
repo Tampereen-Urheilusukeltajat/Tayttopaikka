@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+ 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { type FastifyInstance } from 'fastify';
 import {

@@ -53,7 +53,7 @@ export const useUserRolesMutation = (
   const { isPending, mutate, data, isError } = useMutation({
     mutationFn: async ({ userId, payload }: UserRolesMutationPayload) =>
       patchUserRoles(userId, payload),
-    onSuccess: async (user) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
       toast.success('Käyttäjän rooli päivitetty');
       onSuccess?.();

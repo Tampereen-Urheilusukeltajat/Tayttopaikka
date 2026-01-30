@@ -15,7 +15,7 @@ export const useResetPasswordMutation = (
     onError: () => {
       toast.error('Salasanan asettaminen epäonnistui. Yritä uudelleen.');
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success('Salasana vaihdettu');
       onSuccess();
     },

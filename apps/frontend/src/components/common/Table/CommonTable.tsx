@@ -64,7 +64,6 @@ export const CommonTable: React.FC<CommonTableProps> = ({
   );
 
   return (
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     <div className={`${styles.content} .table-responsive`}>
       <table data-testid="common-table">
         <thead>

@@ -78,7 +78,6 @@ export type CommonTileProps = {
   // TODO FIX THIS
   // Casting as any because array errors wouldn't be otherwise correctly typed
   // It might be possible to fix this in the future with bit more time
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: any;
   values: FormFields;
 };

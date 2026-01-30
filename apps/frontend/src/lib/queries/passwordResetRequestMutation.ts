@@ -16,7 +16,7 @@ export const usePasswordResetRequestMutation = (
     onError: () => {
       toast.error('Palautuslinkin pyyntö epäonnistui. Yritä uudelleen.');
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success('Palautuslinkin pyyntö onnistui');
       onSuccess();
     },

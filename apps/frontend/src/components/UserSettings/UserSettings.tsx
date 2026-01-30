@@ -33,12 +33,6 @@ export type PatchUser = {
 export const UserSettings: React.FC = () => {
   const userId = useMemo(() => getUserIdFromAccessToken(), []);
   const { data: user } = useUserQuery(userId);
-  const { mutate: updateUser } = useUserMutation(() => {
-    setEditingName(false);
-    setEditingEmail(false);
-    setEditingPhone(false);
-    setEditingNewPassword(false);
-  });
 
   // Used to open and close editing panel for field
   // Only one can be open at the same time
@@ -47,6 +41,13 @@ export const UserSettings: React.FC = () => {
   const [editingEmail, setEditingEmail] = useState(false);
   const [editingPhone, setEditingPhone] = useState(false);
   const [editingNewPassword, setEditingNewPassword] = useState(false);
+
+  const { mutate: updateUser } = useUserMutation(() => {
+    setEditingName(false);
+    setEditingEmail(false);
+    setEditingPhone(false);
+    setEditingNewPassword(false);
+  });
 
   const handleFormSubmit = useCallback(
     (fields: Partial<FormUser>) => {

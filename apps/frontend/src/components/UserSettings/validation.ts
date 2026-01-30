@@ -22,7 +22,7 @@ export const USER_SETTINGS_VALIDATION_SCHEMA = yup.object().shape({
             phoneUtil.parse(phoneNumber),
             'FI',
           );
-        } catch (error) {
+        } catch {
           return false;
         }
       },

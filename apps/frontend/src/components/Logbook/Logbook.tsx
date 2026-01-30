@@ -84,7 +84,7 @@ export const NewFillingEvent: React.FC<NewFillingEventProps> = ({
         validationSchema={AIR_FILLING_EVENT_VALIDATION_SCHEMA}
         onSubmit={handleSubmit}
       >
-        {({ errors, values, setFieldValue }) => (
+        {({ errors, values }) => (
           <Form className={styles.form}>
             <LogbookBasicInfoTile
               errors={errors}

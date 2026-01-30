@@ -11,7 +11,7 @@ import { UserSettings } from './components/UserSettings/UserSettings';
 import { BlenderLogbook } from './views/BlenderLogbook';
 import { Logbook } from './views/Logbook';
 import { FillEvents } from './views/FillEvents';
-import React, { useEffect, useState, type JSX } from 'react';
+import React, { type JSX } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { GDPR } from './views/GDPR';
@@ -34,28 +34,12 @@ const BaseElement: React.FC = () => (
 );
 
 const Content: React.FC = () => {
-  const [showSpinner, setShowSpinner] = useState(false);
+  // @TODO: We need to do spinner thing better
   const isFetching = useIsFetching();
-
-  // Show spinner for 150ms even though loading has already finished
-  // Why? If the request is fulfilled from the cache, the loader flashes on
-  // screen for a really short time, and it creates this annoying flashing.
-  // With 150ms user is able to perceive that there was a loading icon,
-  // but it is still so fast that it doesn't bother the user.
-  useEffect(() => {
-    if (isFetching > 0) {
-      setShowSpinner(true);
-      return;
-    }
-
-    setTimeout(() => {
-      setShowSpinner(false);
-    }, 150);
-  }, [isFetching]);
 
   return (
     <main>
-      {showSpinner ? <PageLoadingSpinner /> : null}
+      {isFetching ? <PageLoadingSpinner /> : null}
       <Routes>
         <Route element={<BaseElement />}>
           {/* Public routes */}

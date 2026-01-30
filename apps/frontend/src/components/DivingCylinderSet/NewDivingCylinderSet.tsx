@@ -21,7 +21,6 @@ import { getUserIdFromAccessToken } from '../../lib/utils';
 import { toast } from 'react-toastify';
 import { NEW_CYLINDER_SET_VALIDATION_SCHEMA } from './validation';
 import { TextInput, DropdownMenu } from '../common/Inputs';
-import { type AxiosError } from 'axios';
 import styles from './NewDivingCylinderSet.module.scss';
 
 type FormDivingCylinder = Omit<DivingCylinder, 'id'> & { uniqueId: string };
@@ -44,7 +43,6 @@ type NewDivingCylinderRowProps = {
   fieldProps: FieldArrayRenderProps;
   index: number;
   lastItem: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: any;
   firstCylinder?: Omit<DivingCylinder, 'id'>;
 };
@@ -146,7 +144,7 @@ export const NewDivingCylinderSet: React.FC = () => {
       ]);
       toast.success('Uusi pullosetti lisätty!');
     },
-    onError: (res: AxiosError) => {
+    onError: () => {
       toast.error(
         'Uuden pullosetin luominen epäonnistui. Tarkista tiedot ja yritä uudelleen.',
       );
