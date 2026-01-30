@@ -8,7 +8,7 @@ import fastifyCors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import { fastifyAutoload } from '@fastify/autoload';
 import { type TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import { log } from './lib/utils/log';
+import { log, fastifyLogger } from './lib/utils/log';
 import path from 'path';
 import { errorHandler } from './lib/utils/errorHandler';
 import { type AuthPayload, type AuthUser } from './types/auth.types';
@@ -33,7 +33,7 @@ export const buildServer = async (opts: {
   routePrefix: string;
 }): Promise<FastifyInstance> => {
   const server = fastify({
-    logger: true,
+    logger: fastifyLogger,
     ignoreTrailingSlash: true,
     ajv: {
       customOptions: {
