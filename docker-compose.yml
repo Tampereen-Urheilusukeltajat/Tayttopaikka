@@ -40,13 +40,6 @@ services:
       - MARIADB_USER=blenderi
       - MARIADB_PASSWORD=V3rySecretPasswor4
       - MARIADB_ROOT_PASSWORD=V3rySecretR00tPasswor4
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    command: mysqld --sql_mode="IGNORE_SPACE,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
 
   # Redis Cache
   redis:
