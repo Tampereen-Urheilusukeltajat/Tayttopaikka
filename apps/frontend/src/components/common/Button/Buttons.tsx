@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, type JSX } from 'react';
 import styles from './Buttons.module.scss';
 import { Tooltip } from 'react-tooltip';
 

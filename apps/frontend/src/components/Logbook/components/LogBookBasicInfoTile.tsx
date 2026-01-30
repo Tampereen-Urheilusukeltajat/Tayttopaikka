@@ -1,6 +1,6 @@
 import { type Compressor } from '../../../lib/queries/compressorQuery';
 import { DropdownMenu, TextInput } from '../../common/Inputs';
-import React from 'react';
+import React, { type JSX } from 'react';
 
 type LogbookFillingEventBasicInfo = {
   additionalInformation: string;

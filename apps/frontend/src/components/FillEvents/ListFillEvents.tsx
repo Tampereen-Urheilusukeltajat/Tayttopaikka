@@ -6,7 +6,7 @@ import {
   type TableColumn,
   type TableRow,
 } from '../common/Table/CommonTable';
-import { useMemo } from 'react';
+import { useMemo, type JSX } from 'react';
 
 const FILL_EVENT_COLUMNS: TableColumn[] = [
   {

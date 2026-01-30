@@ -1,6 +1,8 @@
 import { Link, useMatch, useResolvedPath } from 'react-router-dom';
 import styles from './Navbar.module.scss';
 
+import type { JSX } from "react";
+
 export const CustomLink = ({
   className,
   to,

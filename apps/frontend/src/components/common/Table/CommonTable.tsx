@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, type JSX } from 'react';
 import { BsPencil, BsTrash } from 'react-icons/bs';
 import { ElementButton, type ElementButtonProps } from '../Button/Buttons';
 import styles from './CommonTable.module.scss';

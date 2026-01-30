@@ -1,6 +1,8 @@
 import styles from './CommonTable.module.scss';
 import { flexRender, type Table } from '@tanstack/react-table';
 
+import type { JSX } from "react";
+
 type CommonTableProps<T> = {
   table: Table<T>;
   onRowDelete?: (id: string) => void;

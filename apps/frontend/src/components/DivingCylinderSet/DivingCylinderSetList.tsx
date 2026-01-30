@@ -13,7 +13,7 @@ import {
 import { format } from 'date-fns';
 import { BsPencil, BsTrash } from 'react-icons/bs';
 import { useArchieveDivingCylinderSetMutation } from '../../lib/queries/divingCylinderSetMutation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type JSX } from 'react';
 import { Modal } from '../common/Modal/Modal';
 import { toast } from 'react-toastify';
 import { type DivingCylinderSet } from '../../interfaces/DivingCylinderSet';

@@ -11,7 +11,7 @@ import { UserSettings } from './components/UserSettings/UserSettings';
 import { BlenderLogbook } from './views/BlenderLogbook';
 import { Logbook } from './views/Logbook';
 import { FillEvents } from './views/FillEvents';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, type JSX } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { GDPR } from './views/GDPR';

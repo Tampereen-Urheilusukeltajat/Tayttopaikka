@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type JSX } from 'react';
 import { NewFillingEvent } from '../components/Logbook/Logbook';
 import { useCompressorQuery } from '../lib/queries/compressorQuery';
 import { useDivingCylinderQuery } from '../lib/queries/divingCylinderQuery';

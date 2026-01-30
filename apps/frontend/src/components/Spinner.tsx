@@ -1,6 +1,8 @@
 import { Spinner } from 'react-bootstrap';
 import '../styles/spinner/spinner.css';
 
+import type { JSX } from "react";
+
 export const PageLoadingSpinner = (): JSX.Element => (
   <div className="pageSpinnerOverlay">
     <div className="pageSpinnerContainer">

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type JSX } from 'react';
 import { NewBlenderFillingEvent } from '../components/BlenderLogbook/BlenderLogbook';
 import { useCompressorQuery } from '../lib/queries/compressorQuery';
 import { useGasesQuery } from '../lib/queries/gasQuery';
