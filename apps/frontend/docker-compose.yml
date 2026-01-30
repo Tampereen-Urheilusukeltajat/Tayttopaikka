@@ -1,8 +1,0 @@
-services:
-  client:
-    build: .
-    volumes:
-      - /app/node_modules
-      - ./client/src:/app/src/public
-    ports:
-      - 3000:3000

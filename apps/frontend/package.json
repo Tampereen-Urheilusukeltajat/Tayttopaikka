@@ -1,9 +1,19 @@
 {
-  "name": "blenderi-ui",
+  "name": "@tayttopaikka/frontend",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "serve": "vite preview",
+    "lint": "eslint src --max-warnings 0",
+    "format": "prettier -c .",
+    "check-types": "tsc --noEmit",
+    "test": "playwright test",
+    "test:e2e": "start-server-and-test dev 3000 test"
   },
   "dependencies": {
     "@fontsource/roboto": "^5.0.12",
@@ -38,16 +48,6 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "yup": "^1.4.0"
   },
-  "scripts": {
-    "start": "vite",
-    "build": "tsc && vite build",
-    "serve": "vite preview",
-    "lint": "eslint src",
-    "lint-fix": "eslint src --fix",
-    "start-playwright": "npx playwright test",
-    "test:playwright": "start-server-and-test start 3000 start-playwright",
-    "enforce-style": "npx eslint src --max-warnings 0 && npx prettier -c ."
-  },
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -77,8 +77,6 @@
     "eslint-plugin-n": "^16.6.2",
     "eslint-plugin-promise": "^6.1.1",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "husky": "^8.0.1",
-    "lint-staged": "^13.0.3",
     "prettier": "^3.2.5",
     "sass": "^1.55.0",
     "sass-loader": "^13.3.2",

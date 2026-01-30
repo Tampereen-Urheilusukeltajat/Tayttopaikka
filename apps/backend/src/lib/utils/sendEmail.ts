@@ -1,5 +1,5 @@
 import { type EmailMessage } from '../../types/email.types';
-import { createClient, TransactionalEmail } from '@scaleway/sdk';
+import { createClient, Tem } from '@scaleway/sdk';
 
 const SCW_ACCESS_KEY: string | undefined = process.env.SCW_ACCESS_KEY;
 const SCW_SECRET_KEY: string | undefined = process.env.SCW_SECRET_KEY;
@@ -31,7 +31,7 @@ export const sendEmail = async (msg: EmailMessage): Promise<void> => {
     defaultRegion: 'fr-par',
   });
 
-  const emailService = new TransactionalEmail.v1alpha1.API(client);
+  const emailService = new Tem.v1alpha1.API(client);
 
   await emailService.createEmail({
     subject: msg.subject,
