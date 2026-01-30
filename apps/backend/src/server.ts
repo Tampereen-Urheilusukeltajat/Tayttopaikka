@@ -33,7 +33,7 @@ export const buildServer = async (opts: {
   routePrefix: string;
 }): Promise<FastifyInstance> => {
   const server = fastify({
-    logger: fastifyLogger,
+    logger: process.env.CI ? false : fastifyLogger,
     ignoreTrailingSlash: true,
     ajv: {
       customOptions: {
