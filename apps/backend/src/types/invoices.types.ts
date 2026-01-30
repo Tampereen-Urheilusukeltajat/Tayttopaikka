@@ -1,4 +1,4 @@
-import { type Static, Type } from '@fastify/type-provider-typebox';
+import { type Static, Type } from '@sinclair/typebox';
 import { minifiedUserResponse } from './user.types';
 
 const invoiceRow = Type.Object({

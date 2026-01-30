@@ -2,17 +2,17 @@ import fastify, {
   type FastifyInstance,
   type FastifyRequest,
   type FastifyReply,
+  type FastifyError,
 } from 'fastify';
-import { fastifyHelmet } from '@fastify/helmet';
+import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
-import jwt from '@fastify/jwt';
-import { fastifyAutoload } from '@fastify/autoload';
-import { type TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
+import fastifyJwt from '@fastify/jwt';
+import fastifyAutoload from '@fastify/autoload';
 import { log, fastifyLogger } from './lib/utils/log';
 import path from 'path';
 import { errorHandler } from './lib/utils/errorHandler';
 import { type AuthPayload, type AuthUser } from './types/auth.types';
-import { fastifySwagger } from '@fastify/swagger';
+import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import { getUserWithId } from './lib/queries/user';
 
@@ -34,7 +34,9 @@ export const buildServer = async (opts: {
 }): Promise<FastifyInstance> => {
   const server = fastify({
     logger: process.env.CI ? false : fastifyLogger,
-    ignoreTrailingSlash: true,
+    routerOptions: {
+      ignoreTrailingSlash: true,
+    },
     ajv: {
       customOptions: {
         removeAdditional: 'all', // Remove additional params from the body etc
@@ -42,6 +44,7 @@ export const buildServer = async (opts: {
       plugins: [
         (ajv) => {
           ajv.addKeyword({ keyword: 'example' });
+          return ajv;
         },
       ],
     },
@@ -101,7 +104,7 @@ export const buildServer = async (opts: {
         cb(null, true);
       },
     })
-    .register(jwt, {
+    .register(fastifyJwt, {
       secret: JWT_SECRET,
     })
     .decorate(
@@ -132,7 +135,7 @@ export const buildServer = async (opts: {
       dirNameRoutePrefix: (_folderParent, folderName) =>
         `${opts.routePrefix}/${folderName}`,
     })
-    .setErrorHandler(async (error, request, reply) => {
+    .setErrorHandler(async (error: FastifyError, request, reply) => {
       if (error.statusCode === undefined) {
         log.error({
           error: error.name,
@@ -147,7 +150,6 @@ export const buildServer = async (opts: {
 
       await errorHandler(reply, error.statusCode, error.message);
     })
-    .withTypeProvider<TypeBoxTypeProvider>()
     // For some reason AJV counts additional properties to minProperties
     // This hook makes sure, that empty bodies do not pass to handler
     .addHook('preHandler', async (request, reply) => {

@@ -50,5 +50,5 @@ void (async () => {
     process.exit(1);
   }
 
-  log.info('Blenderi backend started successfully');
+  log.info('Tayttopaikka backend started successfully');
 })();

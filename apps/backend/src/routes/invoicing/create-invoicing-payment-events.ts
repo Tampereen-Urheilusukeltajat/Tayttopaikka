@@ -5,14 +5,29 @@ import {
 } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { paymentEvent } from '../../types/payment.types';
-import { type Invoice, invoice } from '../../types/invoices.types';
+import { type Invoice } from '../../types/invoices.types';
 import { createInvoicePaymentEvents } from '../../lib/queries/invoice';
 import { getPaymentEventsWithIds } from '../../lib/queries/payment';
+import { minifiedUserResponse } from '../../types/user.types';
+
+const invoiceRow = Type.Object({
+  id: Type.Number(),
+  date: Type.String(),
+  description: Type.String(),
+  gasMixture: Type.String(),
+  price: Type.Number(),
+});
+
+const invoiceBodySchema = Type.Object({
+  user: minifiedUserResponse,
+  invoiceTotal: Type.Number({ minimum: 0 }),
+  invoiceRows: Type.Array(invoiceRow),
+});
 
 const schema = {
   description: 'Create payment events for invoices',
   tags: ['Invoices'],
-  body: Type.Array(invoice),
+  body: Type.Array(invoiceBodySchema),
   response: {
     201: Type.Array(paymentEvent),
     400: { $ref: 'error' },
