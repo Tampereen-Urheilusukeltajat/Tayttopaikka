@@ -23,9 +23,31 @@ sudo docker-compose up
 ```
 
 Before you run the application, you must populate some tables in the database.
-Tables `compressor` and `storage_cylinder` require at least one valid row before
-the frontend works propelly. You can use e.g. [DBeaver](https://dbeaver.io/)
-for the database manipulation.
+
+#### Quick Start: Database Seeding
+
+The easiest way to get started is to use the database seeding script:
+
+```bash
+pnpm db:seed
+```
+
+This will populate your database with:
+
+- 3 compressors (2 air-only, 1 mixed-gas)
+- Realistic gas prices for all gas types
+- 8 storage cylinders for various gases
+
+For more details, see [src/database/seeds/README.md](./src/database/seeds/README.md)
+
+#### Manual Setup
+
+Alternatively, you can manually populate the tables. Tables `compressor` and
+`storage_cylinder` require at least one valid row before the frontend works
+properly. You can use e.g. [DBeaver](https://dbeaver.io/) for the database
+manipulation.
+
+#### User Roles
 
 To access normal fillment page, set `is_user` to `1`.
 

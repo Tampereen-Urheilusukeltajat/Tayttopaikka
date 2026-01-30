@@ -10,7 +10,9 @@
     "test": "jest",
     "lint": "eslint src --max-warnings 0",
     "format": "prettier -c .",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "db:seed": "knex seed:run",
+    "db:seed:make": "knex seed:make"
   },
   "dependencies": {
     "@fastify/autoload": "^5.8.0",

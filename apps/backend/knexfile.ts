@@ -36,6 +36,9 @@ export default {
     migrations: {
       directory: path.join(__dirname, '/src/database/migrations'),
     },
+    seeds: {
+      directory: path.join(__dirname, '/src/database/seeds'),
+    },
     log: {
       warn(msg: string) {
         log.warn(msg);
