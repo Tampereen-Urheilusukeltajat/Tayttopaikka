@@ -1,5 +1,4 @@
 import { type Knex } from 'knex';
-import snakecaseKeys from 'snakecase-keys';
 import { knexController } from '../../database/database';
 import {
   type UserRoles,
@@ -130,9 +129,17 @@ export const updateUser = async (
 ): Promise<UserResponse> => {
   const db = trx ?? (await knexController.transaction());
 
+  // Convert camelCase keys to snake_case for database
+  const snakeCasePayload = Object.fromEntries(
+    Object.entries(payload).map(([key, value]) => [
+      key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`),
+      value,
+    ]),
+  );
+
   await db('user')
     .where({ id: userId, deleted_at: null })
-    .update(snakecaseKeys(payload));
+    .update(snakeCasePayload);
 
   const editedUser = await getUserWithId(userId, false, db);
 
