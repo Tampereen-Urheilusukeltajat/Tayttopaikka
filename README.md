@@ -1,135 +1,168 @@
-# Turborepo starter
+# Täyttöpaikka
 
-This Turborepo starter is maintained by the Turborepo core team.
+A comprehensive diving cylinder management system for tracking gas fills, cylinder sets, storage cylinders, and invoicing.
 
-## Using this example
+## Overview
 
-Run the following command:
+Täyttöpaikka is a full-stack application built with a Turborepo monorepo structure, designed to manage diving cylinder operations including:
 
-```sh
-npx create-turbo@latest
-```
+- Diving cylinder set management
+- Gas filling operations and event tracking
+- Storage cylinder inventory
+- Invoicing and payment tracking
+- User management with role-based access control
 
-## What's inside?
+## Architecture
 
-This Turborepo includes the following packages/apps:
+This project consists of two main applications:
 
 ### Apps and Packages
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- **`backend`**: Fastify-based REST API with JWT authentication, MariaDB database, and Redis caching
+- **`frontend`**: React + Vite application with TypeScript
+- **`packages`**: Shared packages (if any)
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
-### Utilities
+## Tech Stack
 
-This Turborepo has some additional tools already setup for you:
+### Backend
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+- **Framework**: Fastify with TypeScript
+- **Database**: MariaDB with Knex.js migrations
+- **Cache**: Redis
+- **Authentication**: JWT with bcrypt
+- **Testing**: Jest
+- **API Documentation**: Swagger/OpenAPI
 
-### Build
+### Frontend
 
-To build all apps and packages, run the following command:
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite
+- **UI**: Custom components with SCSS
+- **State Management**: TanStack Query (React Query)
+- **Testing**: Playwright
 
-```
-cd my-turborepo
+### DevOps
 
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
+- **Containerization**: Docker & Docker Compose
+- **Package Manager**: pnpm (v9.0.0)
+- **Monorepo**: Turborepo
+- **Node Version**: >=18
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
+## Prerequisites
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+- Node.js >= 18
+- pnpm >= 9.0.0
+- Docker and Docker Compose (for local development)
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+## Getting Started
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+### Installation
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```bash
+# Install dependencies
+pnpm install
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### Development
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+Run all apps in development mode:
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+```bash
+pnpm dev
 ```
 
-### Remote Caching
+Run specific app:
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+```bash
+# Backend only
+pnpm --filter @tayttopaikka/backend dev
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+# Frontend only
+pnpm --filter @tayttopaikka/frontend dev
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+### Using Docker
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+Start all services (backend, frontend, MariaDB, Redis):
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+```bash
+docker-compose up
 ```
 
-## Useful Links
+The services will be available at:
 
-Learn more about the power of Turborepo:
+- Frontend: http://localhost:80 (or custom `FRONTEND_PORT`)
+- Backend: http://localhost:3000 (or custom `BACKEND_PORT`)
+- MariaDB: localhost:3306
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+### Environment Variables
+
+Create `.env` files in the respective app directories:
+
+**Backend** (`apps/backend/.env`):
+
+```env
+DATABASE_HOST=mariadb
+DATABASE_PORT=3306
+DATABASE_USER=blenderi
+DATABASE_PASSWORD=V3rySecretPasswor4
+DATABASE_NAME=blenderi
+REDIS_HOST=redis
+REDIS_PORT=6379
+JWT_SECRET=your-secret-key
+NODE_ENV=development
+```
+
+**Frontend** (`apps/frontend/.env`):
+
+```env
+VITE_API_URL=http://localhost:3000
+```
+
+## Project Structure
+
+```
+apps/
+├── backend/              # Fastify API server
+│   ├── src/
+│   │   ├── routes/       # API endpoints
+│   │   ├── database/     # Database config & migrations
+│   │   ├── lib/          # Auth, queries, utilities
+│   │   ├── types/        # TypeScript type definitions
+│   │   └── test/         # Jest tests
+│   └── package.json
+├── frontend/             # React application
+│   ├── src/
+│   │   ├── components/   # React components
+│   │   ├── views/        # Page views
+│   │   ├── interfaces/   # TypeScript interfaces
+│   │   └── lib/          # Utilities and helpers
+│   └── package.json
+Dockerfiles/              # Docker build files
+└── packages/             # Shared packages
+```
+
+## Available Scripts
+
+### Root Level
+
+- `pnpm dev` - Run all apps in development mode
+- `pnpm build` - Build all apps
+- `pnpm lint` - Lint all apps
+- `pnpm format` - Format code with Prettier
+- `pnpm check-types` - TypeScript type checking
+
+### Backend
+
+- `pnpm dev` - Start development server with nodemon
+- `pnpm test` - Run Jest tests
+- `pnpm start` - Start production server
+
+### Frontend
+
+- `pnpm dev` - Start Vite dev server
+- `pnpm build` - Build for production
+- `pnpm test` - Run Playwright E2E tests
+- `pnpm serve` - Preview production build
