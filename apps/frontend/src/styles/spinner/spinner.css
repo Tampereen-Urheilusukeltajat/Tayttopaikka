@@ -1,0 +1,25 @@
+.pageSpinnerOverlay {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(102, 102, 102, 0.431372549);
+  backdrop-filter: blur(2px);
+  z-index: 9999;
+}
+
+.pageSpinnerContainer {
+  position: relative;
+  top: 25%;
+  left: 50%;
+}
+
+.pageSpinnerOverlay-exit {
+  opacity: 1;
+}
+
+.pageSpinnerOverlay-exit-active {
+  opacity: 0;
+  transition: opacity 200ms;
+}

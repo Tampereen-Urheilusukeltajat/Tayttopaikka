@@ -1,0 +1,51 @@
+body {
+  background: #F4F4F4;
+  font-family: "Roboto", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: #000000;
+}
+
+input {
+  border-color: #9B9B9B;
+}
+
+code {
+  font-family: source-code-pro Menlo Monaco Consolas "Courier New" monospace;
+}
+
+h1 {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 37.5px;
+}
+
+h2 {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 28px;
+}
+
+h3 {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 20px;
+}
+
+.toast-position {
+  top: 5rem !important;
+}
+
+.btn-primary {
+  background: #1971b1;
+}
+
