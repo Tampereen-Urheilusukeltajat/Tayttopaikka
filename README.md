@@ -48,11 +48,11 @@ Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 - **Containerization**: Docker & Docker Compose
 - **Package Manager**: pnpm (v9.0.0)
 - **Monorepo**: Turborepo
-- **Node Version**: >=18
+- **Node Version**: >=24.12.0
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js >= 24.12.0
 - pnpm >= 9.0.0
 - Docker and Docker Compose (for local development)
 

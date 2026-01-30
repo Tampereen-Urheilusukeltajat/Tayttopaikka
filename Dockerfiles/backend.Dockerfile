@@ -1,4 +1,4 @@
-FROM node:20-alpine as build
+FROM node:24.12.0-alpine as build
 
 ENV NODE_ENV production
 
