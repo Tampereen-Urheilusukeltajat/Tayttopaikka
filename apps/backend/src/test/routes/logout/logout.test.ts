@@ -1,12 +1,12 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
@@ -23,12 +23,12 @@ describe('logout', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('logout');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -51,6 +51,10 @@ describe('logout', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
     refreshToken = tokens.refreshToken;
   });
+
+  afterEach(async () => {
+    await server.close();
+  });
   describe('successful logout', () => {
     test('it returns 200 and has right properties', async () => {
       const res = await server.inject({
@@ -62,9 +66,9 @@ describe('logout', () => {
         },
       });
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(200);
-      expect(resBody.message).toEqual('Refresh token invalidated.');
-      expect(resBody.id).toEqual('1be5abcd-53d4-11ed-9342-0242ac120002');
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(resBody.message, 'Refresh token invalidated.');
+      assert.strictEqual(resBody.id, '1be5abcd-53d4-11ed-9342-0242ac120002');
     });
   });
 
@@ -78,8 +82,8 @@ describe('logout', () => {
       },
     });
     const resBody = JSON.parse(res.body);
-    expect(res.statusCode).toEqual(401);
-    expect(resBody.message).not.toEqual('Refresh token invalidated.');
-    expect(resBody.id).not.toEqual('1be5abcd-53d4-11ed-9342-0242ac120002');
+    assert.strictEqual(res.statusCode, 401);
+    assert.notStrictEqual(resBody.message, 'Refresh token invalidated.');
+    assert.notStrictEqual(resBody.id, '1be5abcd-53d4-11ed-9342-0242ac120002');
   });
 });

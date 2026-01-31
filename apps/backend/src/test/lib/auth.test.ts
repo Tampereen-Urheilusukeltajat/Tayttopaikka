@@ -1,4 +1,5 @@
-import { describe, test, expect } from '@jest/globals';
+import { describe, test } from 'node:test';
+import assert from 'node:assert';
 import { hashPassword } from '../../lib/auth/auth';
 
 describe('Hash password', () => {
@@ -8,10 +9,10 @@ describe('Hash password', () => {
 
     // bcrypt hash should always 60 characters long.
     const hashLength = hashObj.hash.length;
-    expect(hashLength).toEqual(60);
+    assert.strictEqual(hashLength, 60);
 
-    expect(hashObj.hash).not.toEqual(testPass);
-    expect(hashObj.hash).not.toEqual(undefined);
-    expect(hashObj.salt).not.toEqual(undefined);
+    assert.notStrictEqual(hashObj.hash, testPass);
+    assert.notStrictEqual(hashObj.hash, undefined);
+    assert.notStrictEqual(hashObj.salt, undefined);
   });
 });

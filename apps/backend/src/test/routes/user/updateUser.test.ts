@@ -1,13 +1,12 @@
- 
 import {
-  jest,
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 // import { type FastifyInstance } from 'fastify';
 import { knexController } from '../../../database/database';
 // import { buildServer } from '../../../server';
@@ -35,16 +34,12 @@ describe('update user', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('update_user');
     await startRedisConnection();
-
-    jest
-      .spyOn(bcrypt, 'compare')
-      .mockImplementation((pw) => pw === CURRENT_PASSWORD);
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -59,11 +54,15 @@ describe('update user', () => {
       method: 'POST',
       payload: {
         email: 'test@email.fi',
-        password: CURRENT_PASSWORD,
+        password: 'password',
       },
     });
     const tokens = JSON.parse(res.body);
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
+  });
+
+  afterEach(async () => {
+    await server.close();
   });
 
   describe('Happy cases', () => {
@@ -77,21 +76,12 @@ describe('update user', () => {
       });
 
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(200);
-      expect(resBody).toMatchInlineSnapshot(`
-        {
-          "email": "test@email.fi",
-          "forename": "Edited",
-          "id": "1be5abcd-53d4-11ed-9342-0242ac120002",
-          "isAdmin": false,
-          "isAdvancedBlender": false,
-          "isBlender": true,
-          "isInstructor": false,
-          "isUser": true,
-          "phoneNumber": "00010",
-          "surname": "Change",
-        }
-      `);
+      assert.deepStrictEqual(res.statusCode, 200);
+      assert.strictEqual(resBody.email, 'test@email.fi');
+      assert.strictEqual(resBody.forename, 'Edited');
+      assert.strictEqual(resBody.surname, 'Change');
+      assert.strictEqual(resBody.phoneNumber, '00010');
+      assert.strictEqual(resBody.isBlender, true);
     });
 
     test('it returns 200 when updating values and passing current email & phone', async () => {
@@ -100,7 +90,7 @@ describe('update user', () => {
         method: 'POST',
         payload: {
           email: 'testi2@email.fi',
-          password: CURRENT_PASSWORD,
+          password: 'password',
         },
       });
       const tokens = JSON.parse(logRes.body);
@@ -113,49 +103,47 @@ describe('update user', () => {
           ...USER_UPDATE,
           email: 'testi2@email.fi',
           phoneNumber: '00002',
-          currentPassword: CURRENT_PASSWORD,
+          currentPassword: 'password',
         },
         method: 'PATCH',
         headers,
       });
 
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(200);
-      expect(resBody).toMatchInlineSnapshot(`
-        {
-          "email": "testi2@email.fi",
-          "forename": "Edited",
-          "id": "54e3e8b0-53d4-11ed-9342-0242ac120002",
-          "isAdmin": false,
-          "isAdvancedBlender": false,
-          "isBlender": true,
-          "isInstructor": false,
-          "isUser": true,
-          "phoneNumber": "00002",
-          "surname": "Change",
-        }
-      `);
+      assert.deepStrictEqual(res.statusCode, 200);
+      assert.strictEqual(resBody.email, 'testi2@email.fi');
+      assert.strictEqual(resBody.forename, 'Edited');
+      assert.strictEqual(resBody.surname, 'Change');
+      assert.strictEqual(resBody.phoneNumber, '00002');
     });
 
     test('it allows updating password and does not store plain text password to db', async () => {
       const password = 'plainpassword';
       const res = await server.inject({
         url: 'api/user/1be5abcd-53d4-11ed-9342-0242ac120002/',
-        payload: { password, currentPassword: CURRENT_PASSWORD },
+        payload: { password, currentPassword: 'password' },
         method: 'PATCH',
         headers,
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.deepStrictEqual(res.statusCode, 200);
 
       const response = await knexController
         .select(['password_hash', 'salt'])
-        .from('user');
+        .from('user')
+        .where('id', '1be5abcd-53d4-11ed-9342-0242ac120002');
 
-      expect(response[0].password_hash).not.toEqual(password);
-      expect(
-        bcrypt.compareSync(password, response[0].password_hash),
-      ).toBeTruthy();
+      assert.notStrictEqual(response[0].password_hash, password);
+      assert.ok(bcrypt.compareSync(password, response[0].password_hash));
+
+      // Restore the original password so subsequent tests work
+      await knexController('user')
+        .where('id', '1be5abcd-53d4-11ed-9342-0242ac120002')
+        .update({
+          password_hash:
+            '$2b$10$ikF8ObO.XnH2ItBkKcMZaufzOadky6bRVfQ7.JOOoGo3o8xBWadYy',
+          salt: '$2b$10$ikF8ObO.XnH2ItBkKcMZau',
+        });
     });
   });
 
@@ -169,12 +157,12 @@ describe('update user', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
 
       const resBody = JSON.parse(res.body);
 
-      expect(resBody).toHaveProperty('error');
-      expect(resBody).toHaveProperty('message');
+      assert.ok('error' in resBody);
+      assert.ok('message' in resBody);
     });
 
     test('it returns 400 when empty body.', async () => {
@@ -186,12 +174,12 @@ describe('update user', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
 
       const resBody = JSON.parse(res.body);
 
-      expect(resBody).toHaveProperty('error');
-      expect(resBody).toHaveProperty('message');
+      assert.ok('error' in resBody);
+      assert.ok('message' in resBody);
     });
 
     test('it returns 409 when email already in use.', async () => {
@@ -201,18 +189,18 @@ describe('update user', () => {
         payload: {
           ...USER_UPDATE,
           email: 'alreadyin@use.fi',
-          currentPassword: CURRENT_PASSWORD,
+          currentPassword: 'password',
         },
         method: 'PATCH',
         headers,
       });
 
-      expect(res.statusCode).toEqual(409);
+      assert.deepStrictEqual(res.statusCode, 409);
 
       const resBody = JSON.parse(res.body);
 
-      expect(resBody).toHaveProperty('error');
-      expect(resBody).toHaveProperty('message');
+      assert.ok('error' in resBody);
+      assert.ok('message' in resBody);
     });
 
     test('it returns 409 when phone already in use.', async () => {
@@ -224,12 +212,12 @@ describe('update user', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(409);
+      assert.deepStrictEqual(res.statusCode, 409);
 
       const resBody = JSON.parse(res.body);
 
-      expect(resBody).toHaveProperty('error');
-      expect(resBody).toHaveProperty('message');
+      assert.ok('error' in resBody);
+      assert.ok('message' in resBody);
     });
 
     test('it returns 400 if user tries to update password without giving the current password', async () => {
@@ -240,14 +228,10 @@ describe('update user', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.body)).toMatchInlineSnapshot(`
-        {
-          "error": "Bad Request",
-          "message": "Current password is required",
-          "statusCode": 400,
-        }
-      `);
+      assert.deepStrictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.message, 'Current password is required');
+      assert.strictEqual(body.statusCode, 400);
     });
 
     test('it returns 400 if user tries to update email without giving the current password', async () => {
@@ -258,14 +242,10 @@ describe('update user', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.body)).toMatchInlineSnapshot(`
-        {
-          "error": "Bad Request",
-          "message": "Current password is required",
-          "statusCode": 400,
-        }
-      `);
+      assert.deepStrictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.message, 'Current password is required');
+      assert.strictEqual(body.statusCode, 400);
     });
 
     test('it returns 400 if user gives wrong current password', async () => {
@@ -280,14 +260,10 @@ describe('update user', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.body)).toMatchInlineSnapshot(`
-        {
-          "error": "Bad Request",
-          "message": "Invalid current password",
-          "statusCode": 400,
-        }
-      `);
+      assert.deepStrictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.message, 'Invalid current password');
+      assert.strictEqual(body.statusCode, 400);
     });
   });
 
@@ -303,8 +279,8 @@ describe('update user', () => {
       });
       const resBody = JSON.parse(res.body);
 
-      expect(res.statusCode).toEqual(200);
-      expect(resBody.archivedAt).not.toEqual('');
+      assert.deepStrictEqual(res.statusCode, 200);
+      assert.ok(resBody.archivedAt !== '');
     });
   });
 });

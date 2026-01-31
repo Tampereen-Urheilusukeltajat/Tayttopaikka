@@ -1,11 +1,12 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
@@ -23,12 +24,12 @@ describe('Get storage cylinders', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('get_storage_cylinder');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -50,49 +51,22 @@ describe('Get storage cylinders', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('Happy path', () => {
-    test('responds with the storage cylinders and with the 200 status', async () => {
+    test('responds with the storage cylinders and with the 200 status', async (t) => {
       const res = await server.inject({
         headers,
         method: 'GET',
         url: 'api/storage-cylinder',
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.strictEqual(res.statusCode, 200);
       const body: StorageCylinder = JSON.parse(res.body);
 
-      expect(body).toMatchInlineSnapshot(`
-        [
-          {
-            "gasId": "2",
-            "id": "1",
-            "maxPressure": 200,
-            "name": "1",
-            "volume": 50,
-          },
-          {
-            "gasId": "3",
-            "id": "2",
-            "maxPressure": 200,
-            "name": "1",
-            "volume": 50,
-          },
-          {
-            "gasId": "4",
-            "id": "3",
-            "maxPressure": 200,
-            "name": "1",
-            "volume": 50,
-          },
-          {
-            "gasId": "5",
-            "id": "4",
-            "maxPressure": 200,
-            "name": "1",
-            "volume": 24,
-          },
-        ]
-      `);
+      await t.assert.snapshot(body);
     });
   });
 
@@ -103,7 +77,7 @@ describe('Get storage cylinders', () => {
         url: 'api/storage-cylinder',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.strictEqual(res.statusCode, 401);
     });
   });
 });

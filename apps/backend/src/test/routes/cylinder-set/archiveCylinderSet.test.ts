@@ -1,12 +1,12 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
@@ -24,12 +24,12 @@ describe('delete cylinder set', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('delete_cylinder_set');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -49,6 +49,10 @@ describe('delete cylinder set', () => {
     });
     const tokens = JSON.parse(res.body);
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
+  });
+
+  afterEach(async () => {
+    await server.close();
   });
 
   describe('authenticated', () => {
@@ -75,9 +79,12 @@ describe('delete cylinder set', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.deepStrictEqual(res.statusCode, 200);
       const responseBody = JSON.parse(res.body);
-      expect(responseBody.divingCylinderSetId).toEqual(divingCylinderSetId);
+      assert.deepStrictEqual(
+        responseBody.divingCylinderSetId,
+        divingCylinderSetId,
+      );
 
       // Set is archived from diving_cylinder_set
       const setResponse = await knexController
@@ -85,7 +92,7 @@ describe('delete cylinder set', () => {
         .from<DivingCylinderSet>('diving_cylinder_set')
         .where('id', divingCylinderSetId);
 
-      expect(setResponse[0]).toEqual({ archived: 1 });
+      assert.strictEqual(setResponse[0].archived, 1);
 
       // only given dc set is archived
       const response1 = await knexController
@@ -93,7 +100,7 @@ describe('delete cylinder set', () => {
         .from('diving_cylinder_set')
         .where('archived', 1);
 
-      expect(response1.length).toEqual(1);
+      assert.deepStrictEqual(response1.length, 1);
     });
 
     test('it responses 404 when no set with given id', async () => {
@@ -103,7 +110,7 @@ describe('delete cylinder set', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(404);
+      assert.deepStrictEqual(res.statusCode, 404);
     });
     test('it responses 400 when no id given', async () => {
       const res = await server.inject({
@@ -112,7 +119,7 @@ describe('delete cylinder set', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(404);
+      assert.deepStrictEqual(res.statusCode, 404);
     });
 
     test('it responses 400 when malformed id', async () => {
@@ -122,7 +129,7 @@ describe('delete cylinder set', () => {
         headers,
       });
 
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
     });
   });
 
@@ -133,9 +140,12 @@ describe('delete cylinder set', () => {
       headers: { Authorization: 'Bearer definitely not valid jwt token' },
     });
 
-    expect(res.statusCode).toEqual(401);
+    assert.deepStrictEqual(res.statusCode, 401);
     const responseBody = JSON.parse(res.body);
 
-    expect(responseBody).toEqual({ statusCode: 401, error: 'Unauthorized' });
+    assert.deepStrictEqual(responseBody, {
+      statusCode: 401,
+      error: 'Unauthorized',
+    });
   });
 });

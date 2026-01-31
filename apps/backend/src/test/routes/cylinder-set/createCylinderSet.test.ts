@@ -1,12 +1,12 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
@@ -23,12 +23,12 @@ describe('create cylinder set', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('create_cylinder_set');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -48,6 +48,10 @@ describe('create cylinder set', () => {
     });
     const tokens = JSON.parse(res.body);
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
+  });
+
+  afterEach(async () => {
+    await server.close();
   });
 
   test('it responds with 201 and proper body if creation was successful', async () => {
@@ -72,20 +76,26 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(201);
+    assert.deepStrictEqual(res.statusCode, 201);
     const responseBody = JSON.parse(res.body);
 
     // remove ids to enable comparison.
     delete responseBody.id;
     delete responseBody.cylinders[0].id;
 
-    expect(responseBody.cylinders[0].inspection).toContain(
-      payload.cylinders[0].inspection,
+    // Check inspection field exists and contains the expected date
+    assert.ok(responseBody.cylinders[0].inspection);
+    assert.ok(
+      responseBody.cylinders[0].inspection.includes(
+        payload.cylinders[0].inspection,
+      ),
     );
-    delete responseBody.cylinders[0].inspection;
 
-    payload.cylinders[0].inspection = responseBody.cylinders[0].inspection;
-    expect(responseBody).toEqual(payload);
+    // Delete inspection from both for comparison since it has timestamp
+    delete responseBody.cylinders[0].inspection;
+    delete payload.cylinders[0].inspection;
+
+    assert.deepStrictEqual(responseBody, payload);
   });
 
   test('it responds with 201 and proper body if creation of multiple cylinder set was successful', async () => {
@@ -117,28 +127,28 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(201);
+    assert.deepStrictEqual(res.statusCode, 201);
     const responseBody = JSON.parse(res.body);
 
-    expect(responseBody).toHaveProperty('id');
-    expect(responseBody.cylinders[0]).toHaveProperty('id');
-    expect(responseBody.cylinders[1]).toHaveProperty('id');
+    assert.ok('id' in responseBody);
+    assert.ok('id' in responseBody.cylinders[0]);
+    assert.ok('id' in responseBody.cylinders[1]);
 
-    expect(responseBody.cylinders[0]).toHaveProperty('inspection');
-    expect(responseBody.cylinders[1]).toHaveProperty('inspection');
+    assert.ok('inspection' in responseBody.cylinders[0]);
+    assert.ok('inspection' in responseBody.cylinders[1]);
 
     for (const cylinder of responseBody.cylinders) {
       const expected =
         cylinder.serialNumber === '3540965436löj564'
           ? payload.cylinders[0]
           : payload.cylinders[1];
-      expect(cylinder.volume).toEqual(expected.volume);
-      expect(cylinder.pressure).toEqual(expected.pressure);
-      expect(cylinder.material).toEqual(expected.material);
+      assert.deepStrictEqual(cylinder.volume, expected.volume);
+      assert.deepStrictEqual(cylinder.pressure, expected.pressure);
+      assert.deepStrictEqual(cylinder.material, expected.material);
     }
 
-    expect(responseBody.owner).toEqual(payload.owner);
-    expect(responseBody.name).toEqual(payload.name);
+    assert.deepStrictEqual(responseBody.owner, payload.owner);
+    assert.deepStrictEqual(responseBody.name, payload.name);
     const tokens = JSON.parse(res.body);
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
@@ -167,8 +177,9 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(400);
-    expect(JSON.parse(res.body).message).toEqual(
+    assert.deepStrictEqual(res.statusCode, 400);
+    assert.strictEqual(
+      JSON.parse(res.body).message,
       'Inspection date from the future',
     );
   });
@@ -194,8 +205,8 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(400);
-    expect(JSON.parse(res.body).message).toEqual('User not found');
+    assert.deepStrictEqual(res.statusCode, 400);
+    assert.strictEqual(JSON.parse(res.body).message, 'User not found');
   });
 
   test('it responds with 400 if some cylinder has invalid value for volume', async () => {
@@ -219,7 +230,7 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(400);
+    assert.deepStrictEqual(res.statusCode, 400);
   });
 
   test('it responds with 400 if some cylinder has invalid value for pressure', async () => {
@@ -243,7 +254,7 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(400);
+    assert.deepStrictEqual(res.statusCode, 400);
   });
 
   test('it responds with 400 if set does not have cylinders', async () => {
@@ -259,7 +270,7 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(400);
+    assert.deepStrictEqual(res.statusCode, 400);
   });
 
   test('it responds with 400 if set name is too long', async () => {
@@ -284,7 +295,7 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(400);
+    assert.deepStrictEqual(res.statusCode, 400);
   });
 
   test('it responds with 400 if owner id is not in uuid format', async () => {
@@ -309,10 +320,13 @@ describe('create cylinder set', () => {
       payload,
     });
 
-    expect(res.statusCode).toEqual(400);
+    assert.deepStrictEqual(res.statusCode, 400);
 
     const responseBody = JSON.parse(res.body);
-    expect(responseBody.message).toEqual('body/owner must match format "uuid"');
+    assert.deepStrictEqual(
+      responseBody.message,
+      'body/owner must match format "uuid"',
+    );
   });
 
   test('it responds with 401 if request is unauthenticated', async () => {
@@ -337,9 +351,12 @@ describe('create cylinder set', () => {
       headers: { Authorization: 'Bearer definitely not valid jwt token' },
     });
 
-    expect(res.statusCode).toEqual(401);
+    assert.deepStrictEqual(res.statusCode, 401);
     const responseBody = JSON.parse(res.body);
 
-    expect(responseBody).toEqual({ statusCode: 401, error: 'Unauthorized' });
+    assert.deepStrictEqual(responseBody, {
+      statusCode: 401,
+      error: 'Unauthorized',
+    });
   });
 });

@@ -1,11 +1,12 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
@@ -23,12 +24,12 @@ describe('Get compressors', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('get_compressors');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -50,35 +51,22 @@ describe('Get compressors', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('Happy path', () => {
-    test('responds with the compressors and with the 200 status', async () => {
+    test('responds with the compressors and with the 200 status', async (t) => {
       const res = await server.inject({
         headers,
         method: 'GET',
         url: 'api/compressor',
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.strictEqual(res.statusCode, 200);
       const body: Compressor = JSON.parse(res.body);
 
-      expect(body).toMatchInlineSnapshot(`
-        [
-          {
-            "airOnly": true,
-            "description": "se punainen Maijalassa",
-            "id": "1be5abcd-53d4-11ed-9342-0242ac120002",
-            "isEnabled": true,
-            "name": "iso kompura",
-          },
-          {
-            "airOnly": true,
-            "description": "siä takana",
-            "id": "54e3e8b0-53d4-11ed-9342-0242ac120002",
-            "isEnabled": false,
-            "name": "varakompura",
-          },
-        ]
-      `);
+      await t.assert.snapshot(body);
     });
   });
 
@@ -89,7 +77,7 @@ describe('Get compressors', () => {
         url: 'api/compressor',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.strictEqual(res.statusCode, 401);
     });
   });
 });

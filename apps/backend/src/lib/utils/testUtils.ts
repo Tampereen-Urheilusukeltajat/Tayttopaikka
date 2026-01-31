@@ -129,17 +129,14 @@ export const createTestDatabase = async (
     },
   });
 
-  await adminKnex.raw(`CREATE DATABASE IF NOT EXISTS :testDatabase:;`, {
-    testDatabase: TEST_DATABASE,
-  });
-  await adminKnex.raw(
-    `GRANT ALL PRIVILEGES ON :testDatabase:.* TO :testUser@'%' IDENTIFIED BY :testUserPassword`,
-    {
-      testDatabase: TEST_DATABASE,
-      testUser: TEST_USER,
-      testUserPassword: TEST_USER_PASSWORD,
-    },
-  );
+  // Drop database if it exists to ensure clean state
+  await adminKnex.raw(`DROP DATABASE IF EXISTS ??;`, [TEST_DATABASE]);
+  await adminKnex.raw(`CREATE DATABASE ??;`, [TEST_DATABASE]);
+  await adminKnex.raw(`GRANT ALL PRIVILEGES ON ??.* TO ?@'%' IDENTIFIED BY ?`, [
+    TEST_DATABASE,
+    TEST_USER,
+    TEST_USER_PASSWORD,
+  ]);
   await adminKnex.destroy();
 
   await runMigrations();
@@ -161,9 +158,7 @@ export const dropTestDatabase = async (): Promise<void> => {
       password: MYSQL_ROOT_PASSWORD,
     },
   });
-  await adminKnex.raw(`DROP DATABASE IF EXISTS :testDatabase:;`, {
-    testDatabase: TEST_DATABASE,
-  });
+  await adminKnex.raw(`DROP DATABASE IF EXISTS ??;`, [TEST_DATABASE]);
   await adminKnex.destroy();
 };
 

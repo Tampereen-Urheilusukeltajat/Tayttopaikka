@@ -1,5 +1,5 @@
- 
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, test, before, after } from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
@@ -16,12 +16,12 @@ describe('get cylinder sets', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('get_diving_cylinder_sets');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -29,7 +29,7 @@ describe('get cylinder sets', () => {
 
   let server;
   let headers: object;
-  test('returns users diving cylinder sets', async () => {
+  test('returns users diving cylinder sets', async (t) => {
     server = await getTestInstance();
     const authRes = await server.inject({
       url: '/api/login',
@@ -48,11 +48,11 @@ describe('get cylinder sets', () => {
       headers,
     });
 
-    expect(res.statusCode).toEqual(200);
+    assert.strictEqual(res.statusCode, 200);
 
     const body = JSON.parse(res.body);
-    expect(body.length).toEqual(3);
-    expect(body).toMatchSnapshot();
+    assert.strictEqual(body.length, 3);
+    await t.assert.snapshot(body);
   });
 
   test('does not allow reading other users diving cylinders', async () => {
@@ -74,7 +74,7 @@ describe('get cylinder sets', () => {
       headers,
     });
 
-    expect(res.statusCode).toEqual(403);
+    assert.strictEqual(res.statusCode, 403);
   });
 
   test('admin is able to read other users diving cylinders', async () => {
@@ -96,10 +96,10 @@ describe('get cylinder sets', () => {
       headers,
     });
 
-    expect(dcsResponse.statusCode).toEqual(200);
+    assert.strictEqual(dcsResponse.statusCode, 200);
 
     const body = JSON.parse(dcsResponse.body);
-    expect(body.length).toEqual(3);
+    assert.strictEqual(body.length, 3);
   });
 
   test('returns empty array if user does not have cylinder sets', async () => {
@@ -121,10 +121,10 @@ describe('get cylinder sets', () => {
       headers,
     });
 
-    expect(dcsResponse.statusCode).toEqual(200);
+    assert.strictEqual(dcsResponse.statusCode, 200);
 
     const body = JSON.parse(dcsResponse.body);
-    expect(body).toEqual([]);
+    assert.deepStrictEqual(body, []);
   });
 
   test('returns empty array if user is not found', async () => {
@@ -146,9 +146,9 @@ describe('get cylinder sets', () => {
       headers,
     });
 
-    expect(dcsResponse.statusCode).toEqual(200);
+    assert.strictEqual(dcsResponse.statusCode, 200);
 
     const body = JSON.parse(dcsResponse.body);
-    expect(body).toEqual([]);
+    assert.deepStrictEqual(body, []);
   });
 });

@@ -1,11 +1,12 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
@@ -22,12 +23,12 @@ describe('Set new password', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('password_reset');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -36,6 +37,10 @@ describe('Set new password', () => {
   let server;
   beforeEach(async () => {
     server = await getTestInstance();
+  });
+
+  afterEach(async () => {
+    await server.close();
   });
 
   test('It returns 204 for existing user', async () => {
@@ -49,7 +54,7 @@ describe('Set new password', () => {
       },
     });
 
-    expect(res.statusCode).toEqual(204);
+    assert.strictEqual(res.statusCode, 204);
   });
 
   test('It returns 204 for nonexistent user', async () => {
@@ -63,6 +68,6 @@ describe('Set new password', () => {
       },
     });
 
-    expect(res.statusCode).toEqual(204);
+    assert.strictEqual(res.statusCode, 204);
   });
 });

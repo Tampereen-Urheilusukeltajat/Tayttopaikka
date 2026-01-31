@@ -1,0 +1,18 @@
+exports[`Get compressors > Happy path > responds with the compressors and with the 200 status 1`] = `
+[
+  {
+    "id": "1be5abcd-53d4-11ed-9342-0242ac120002",
+    "name": "iso kompura",
+    "description": "se punainen Maijalassa",
+    "isEnabled": true,
+    "airOnly": true
+  },
+  {
+    "id": "54e3e8b0-53d4-11ed-9342-0242ac120002",
+    "name": "varakompura",
+    "description": "siä takana",
+    "isEnabled": false,
+    "airOnly": true
+  }
+]
+`;

@@ -1,11 +1,12 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
@@ -22,12 +23,12 @@ describe('Get invoices', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('update_user_roles');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -49,6 +50,10 @@ describe('Get invoices', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('Happy path', () => {
     test('is able to remove blender role', async () => {
       const userId = '54e3e8b0-53d4-11ed-9342-0242ac120002';
@@ -61,9 +66,9 @@ describe('Get invoices', () => {
         },
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.strictEqual(res.statusCode, 200);
       const updatedUser = JSON.parse(res.body);
-      expect(updatedUser.isBlender).toBeFalsy();
+      assert.strictEqual(updatedUser.isBlender, false);
 
       const res2 = await server.inject({
         method: 'PATCH',
@@ -74,9 +79,9 @@ describe('Get invoices', () => {
         },
       });
 
-      expect(res2.statusCode).toEqual(200);
+      assert.strictEqual(res2.statusCode, 200);
       const updatedUser2 = JSON.parse(res2.body);
-      expect(updatedUser2.isBlender).toBeTruthy();
+      assert.strictEqual(updatedUser2.isBlender, true);
     });
 
     test('is able to add admin role', async () => {
@@ -90,9 +95,9 @@ describe('Get invoices', () => {
         },
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.strictEqual(res.statusCode, 200);
       const updatedUser = JSON.parse(res.body);
-      expect(updatedUser.isAdmin).toBeTruthy();
+      assert.strictEqual(updatedUser.isAdmin, true);
     });
   });
 
@@ -103,7 +108,7 @@ describe('Get invoices', () => {
         url: 'api/invoicing',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.strictEqual(res.statusCode, 401);
     });
 
     test('responds with 403 if the user is not an admin', async () => {
@@ -124,7 +129,7 @@ describe('Get invoices', () => {
         url: 'api/invoicing',
       });
 
-      expect(res.statusCode).toEqual(403);
+      assert.strictEqual(res.statusCode, 403);
     });
 
     test('responds with 404 if user does not exist', async () => {
@@ -138,7 +143,7 @@ describe('Get invoices', () => {
         },
       });
 
-      expect(res.statusCode).toEqual(404);
+      assert.strictEqual(res.statusCode, 404);
     });
 
     test('responds with 400 if roles payload is invalid', async () => {
@@ -152,7 +157,7 @@ describe('Get invoices', () => {
         },
       });
 
-      expect(res.statusCode).toEqual(400);
+      assert.strictEqual(res.statusCode, 400);
     });
   });
 });

@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "nodemon",
     "start": "ts-node --transpile-only ./src/app.ts",
-    "test": "jest",
+    "test": "tsx --test --test-concurrency=1",
+    "test:coverage": "tsx --test --test-concurrency=1 --experimental-test-coverage",
+    "test:watch": "tsx --test --test-concurrency=1 --watch",
     "lint": "eslint src --max-warnings 0",
     "format": "prettier -c .",
     "check-types": "tsc --noEmit",
@@ -35,26 +37,21 @@
     "winston": "^3.19.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.6",
-    "@babel/preset-env": "^7.28.6",
-    "@babel/preset-typescript": "^7.28.5",
-    "@jest/globals": "^30.2.0",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^25.1.0",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
-    "babel-jest": "^30.2.0",
     "eslint": "^9.39.2",
     "eslint-config-love": "^149.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-n": "^17.23.2",
     "eslint-plugin-promise": "^7.2.1",
-    "jest": "^30.2.0",
     "lint-staged": "^16.2.7",
     "nodemon": "^3.1.11",
     "prettier": "^3.8.1",
-    "prettier-2": "npm:prettier@^3.8.1"
+    "prettier-2": "npm:prettier@^3.8.1",
+    "tsx": "^4.21.0"
   },
   "repository": {
     "type": "git",

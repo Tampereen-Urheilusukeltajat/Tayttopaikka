@@ -1,12 +1,12 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
@@ -23,12 +23,12 @@ describe('Get users', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('get_users');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -50,6 +50,10 @@ describe('Get users', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   test('it returns all not archived or deleted users', async () => {
     const res = await server.inject({
       url: '/api/user/',
@@ -60,8 +64,8 @@ describe('Get users', () => {
       .where({ archived_at: null, deleted_at: null })
       .select('id');
     const resBody = JSON.parse(res.body);
-    expect(res.statusCode).toEqual(200);
-    expect(resBody).toHaveLength(users.length);
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(resBody.length, users.length);
   });
 
   test('it returns all users', async () => {
@@ -74,8 +78,8 @@ describe('Get users', () => {
       .whereNull('deleted_at')
       .select('id');
     const resBody = JSON.parse(res.body);
-    expect(res.statusCode).toEqual(200);
-    expect(resBody).toHaveLength(users.length);
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(resBody.length, users.length);
   });
 
   test('it only returns users to admins', async () => {
@@ -101,6 +105,6 @@ describe('Get users', () => {
     });
 
     // Expect a forbidden status code
-    expect(res.statusCode).toEqual(403);
+    assert.strictEqual(res.statusCode, 403);
   });
 });

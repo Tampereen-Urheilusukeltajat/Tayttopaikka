@@ -1,12 +1,12 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
@@ -23,12 +23,12 @@ describe('Get user', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('get_user');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -49,16 +49,20 @@ describe('Get user', () => {
     const tokens = JSON.parse(res.body);
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
+
+  afterEach(async () => {
+    await server.close();
+  });
   describe('User is found', () => {
-    test('it returns 200 and has right properties', async () => {
+    test('it returns 200 and has right properties', async (t) => {
       const res = await server.inject({
         url: '/api/user/1be5abcd-53d4-11ed-9342-0242ac120002/',
         method: 'GET',
         headers,
       });
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(200);
-      expect(resBody).toMatchSnapshot();
+      assert.strictEqual(res.statusCode, 200);
+      await t.assert.snapshot(resBody);
     });
   });
   describe('User cant be returned', () => {
@@ -68,10 +72,10 @@ describe('Get user', () => {
         method: 'GET',
         headers,
       });
-      expect(res.statusCode).toEqual(404);
+      assert.strictEqual(res.statusCode, 404);
       const resBody = JSON.parse(res.body);
-      expect(resBody).toHaveProperty('error');
-      expect(resBody).toHaveProperty('message');
+      assert.ok('error' in resBody);
+      assert.ok('message' in resBody);
     });
 
     test('it returns 404 if user is archived', async () => {
@@ -80,10 +84,10 @@ describe('Get user', () => {
         method: 'GET',
         headers,
       });
-      expect(res.statusCode).toEqual(404);
+      assert.strictEqual(res.statusCode, 404);
       const resBody = JSON.parse(res.body);
-      expect(resBody).toHaveProperty('error');
-      expect(resBody).toHaveProperty('message');
+      assert.ok('error' in resBody);
+      assert.ok('message' in resBody);
     });
 
     test('it returns 404 if user is deleted', async () => {
@@ -92,10 +96,10 @@ describe('Get user', () => {
         method: 'GET',
         headers,
       });
-      expect(res.statusCode).toEqual(404);
+      assert.strictEqual(res.statusCode, 404);
       const resBody = JSON.parse(res.body);
-      expect(resBody).toHaveProperty('error');
-      expect(resBody).toHaveProperty('message');
+      assert.ok('error' in resBody);
+      assert.ok('message' in resBody);
     });
   });
 });

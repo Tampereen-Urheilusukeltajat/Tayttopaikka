@@ -1,0 +1,16 @@
+exports[`Delete user > successful > it archives cylinder sets 1`] = `
+[
+  {
+    "id": "a4e1035e-f36e-4056-9a1b-5925a3c5793e",
+    "archived": 1
+  },
+  {
+    "id": "b4e1035e-f36e-4056-9a1b-5925a3c5793e",
+    "archived": 1
+  },
+  {
+    "id": "f4e1035e-f36e-4056-9a1b-5925a3c5793e",
+    "archived": 1
+  }
+]
+`;

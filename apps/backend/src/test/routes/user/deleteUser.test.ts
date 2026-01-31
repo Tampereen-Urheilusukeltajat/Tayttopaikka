@@ -1,12 +1,12 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
@@ -23,12 +23,12 @@ describe('Delete user', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('delete_user');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -37,6 +37,10 @@ describe('Delete user', () => {
   let server;
   beforeEach(async () => {
     server = await getTestInstance();
+  });
+
+  afterEach(async () => {
+    await server.close();
   });
 
   /**
@@ -64,9 +68,9 @@ describe('Delete user', () => {
         headers,
       });
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(200);
-      expect(resBody.userId).toMatch(delUserId);
-      expect(resBody.deletedAt).not.toBeNull();
+      assert.strictEqual(res.statusCode, 200);
+      assert.match(resBody.userId, new RegExp(delUserId));
+      assert.notStrictEqual(resBody.deletedAt, null);
     });
 
     test('it anonymizes user data', async () => {
@@ -79,33 +83,18 @@ describe('Delete user', () => {
           'phone_number',
           'deleted_at as deletedAt',
         );
-      expect(res.email).toBeNull();
-      expect(res.forename).toBeNull();
-      expect(res.surname).toBeNull();
-      expect(res.phone_number).toBeNull();
-      expect(res.deletedAt).not.toBeNull();
+      assert.strictEqual(res.email, null);
+      assert.strictEqual(res.forename, null);
+      assert.strictEqual(res.surname, null);
+      assert.strictEqual(res.phone_number, null);
+      assert.notStrictEqual(res.deletedAt, null);
     });
 
-    test('it archives cylinder sets', async () => {
+    test('it archives cylinder sets', async (t) => {
       const res = await knexController('diving_cylinder_set')
         .where({ owner: delUserId })
         .select('id', 'archived');
-      expect(res).toMatchInlineSnapshot(`
-        [
-          RowDataPacket {
-            "archived": 1,
-            "id": "a4e1035e-f36e-4056-9a1b-5925a3c5793e",
-          },
-          RowDataPacket {
-            "archived": 1,
-            "id": "b4e1035e-f36e-4056-9a1b-5925a3c5793e",
-          },
-          RowDataPacket {
-            "archived": 1,
-            "id": "f4e1035e-f36e-4056-9a1b-5925a3c5793e",
-          },
-        ]
-      `);
+      await t.assert.snapshot(res);
     });
   });
 
@@ -127,7 +116,7 @@ describe('Delete user', () => {
         method: 'DELETE',
         headers,
       });
-      expect(res.statusCode).toEqual(404);
+      assert.strictEqual(res.statusCode, 404);
     });
 
     test('it returns 403 when user is not an admin', async () => {
@@ -147,7 +136,7 @@ describe('Delete user', () => {
         method: 'DELETE',
         headers,
       });
-      expect(res.statusCode).toEqual(403);
+      assert.strictEqual(res.statusCode, 403);
     });
   });
 });

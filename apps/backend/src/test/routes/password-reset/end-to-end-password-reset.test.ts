@@ -1,4 +1,5 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, test } from 'node:test';
+import assert from 'node:assert';
 import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
@@ -32,7 +33,7 @@ describe('Password can be changed', () => {
         },
       });
 
-      expect(resetRequestResponse.statusCode).toEqual(202);
+      assert.deepStrictEqual(resetRequestResponse.statusCode, 202);
 
       // @ts-expect-error: getMessage is injected to mock function
       const requestMessage: string = await sgMail.getMessage();
@@ -60,7 +61,10 @@ describe('Password can be changed', () => {
         },
       });
 
-      expect(setPasswordResponseWithInvalidToken.statusCode).toEqual(204);
+      assert.deepStrictEqual(
+        setPasswordResponseWithInvalidToken.statusCode,
+        204,
+      );
 
       // Wait for possible unwanted password resetting to be done
       await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -76,7 +80,7 @@ describe('Password can be changed', () => {
         },
       });
 
-      expect(validLoginWithOldPasswordResponse.statusCode).toEqual(200);
+      assert.deepStrictEqual(validLoginWithOldPasswordResponse.statusCode, 200);
 
       // Try to log in with password that has been tried to be set
 
@@ -89,7 +93,10 @@ describe('Password can be changed', () => {
         },
       });
 
-      expect(invalidLoginWithInvalidlyChangedPassword.statusCode).toEqual(401);
+      assert.deepStrictEqual(
+        invalidLoginWithInvalidlyChangedPassword.statusCode,
+        401,
+      );
 
       // @ts-expect-error: getMessage is injected to mock function
       sgMail.setMailWaiter();
@@ -104,12 +111,14 @@ describe('Password can be changed', () => {
         },
       });
 
-      expect(setPasswordResponse.statusCode).toEqual(204);
+      assert.deepStrictEqual(setPasswordResponse.statusCode, 204);
 
       // @ts-expect-error: getMessage is injected to mock function
       const setMessage: string = await sgMail.getMessage();
-      expect(setMessage).toContain(
-        'Sait tämän viestin, koska olet vaihtanut salasanasi Tampereen Urheilusukeltajien Täyttöpaikka-palveluun.',
+      assert.ok(
+        setMessage.includes(
+          'Sait tämän viestin, koska olet vaihtanut salasanasi Tampereen Urheilusukeltajien Täyttöpaikka-palveluun.',
+        ),
       );
 
       const oldPasswordLoginResponse = await server.inject({
@@ -121,7 +130,7 @@ describe('Password can be changed', () => {
         },
       });
 
-      expect(oldPasswordLoginResponse.statusCode).toEqual(401);
+      assert.deepStrictEqual(oldPasswordLoginResponse.statusCode, 401);
 
       const validLoginResponse = await server.inject({
         url: '/api/login',
@@ -132,7 +141,7 @@ describe('Password can be changed', () => {
         },
       });
 
-      expect(validLoginResponse.statusCode).toEqual(200);
+      assert.deepStrictEqual(validLoginResponse.statusCode, 200);
 
       await dropTestDatabase();
       await knexController.destroy();

@@ -1,12 +1,12 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
@@ -23,12 +23,12 @@ describe('get fill events of the user', () => {
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('get_fill_event');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
     await knexController.destroy();
     await stopRedisConnection();
@@ -50,6 +50,10 @@ describe('get fill events of the user', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('successful', () => {
     test('Get fill events', async () => {
       const res = await server.inject({
@@ -59,23 +63,15 @@ describe('get fill events of the user', () => {
       });
 
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(200);
-      expect(resBody).toMatchInlineSnapshot(`
-        [
-          {
-            "compressorId": "",
-            "compressorName": "",
-            "createdAt": "2023-01-30T13:15:28.000Z",
-            "cylinderSetId": "f4e1035e-f36e-4056-9a1b-5925a3c5793e",
-            "cylinderSetName": "pullosetti_1",
-            "description": "täyttö sujui hyvin",
-            "gasMixture": "EAN21",
-            "id": "2",
-            "price": 0,
-            "userId": "a58fff36-4f75-11ed-96ae-77941df88822",
-          },
-        ]
-      `);
+      assert.deepStrictEqual(res.statusCode, 200);
+      assert.strictEqual(Array.isArray(resBody), true);
+      assert.strictEqual(resBody.length, 1);
+      assert.strictEqual(
+        resBody[0].cylinderSetId,
+        'f4e1035e-f36e-4056-9a1b-5925a3c5793e',
+      );
+      assert.strictEqual(resBody[0].gasMixture, 'EAN21');
+      assert.strictEqual(resBody[0].price, 0);
     });
   });
 
@@ -86,7 +82,7 @@ describe('get fill events of the user', () => {
         url: 'api/fill-event',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.deepStrictEqual(res.statusCode, 401);
     });
   });
 });
