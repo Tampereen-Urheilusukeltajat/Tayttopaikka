@@ -13,13 +13,14 @@ import {
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 
 describe('create fill event', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -30,7 +31,6 @@ describe('create fill event', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -57,8 +57,8 @@ describe('create fill event', () => {
   describe('successful', () => {
     after(async () => {
       // delete successful fill events
-      await knexController('fill_event_gas_fill').del();
-      await knexController('fill_event').del();
+      await getTestKnex()('fill_event_gas_fill').del();
+      await getTestKnex()('fill_event').del();
     });
 
     test('it creates a new fill event with only compressed air', async () => {
@@ -80,10 +80,10 @@ describe('create fill event', () => {
       assert.deepStrictEqual(res.statusCode, 201);
       assert.deepStrictEqual(resBody.price, 0);
 
-      const fillEvent = await knexController('fill_event')
+      const fillEvent = await getTestKnex()('fill_event')
         .where('id', resBody.id)
         .select();
-      const fillEventGasFills = await knexController('fill_event_gas_fill')
+      const fillEventGasFills = await getTestKnex()('fill_event_gas_fill')
         .where('fill_event_id', resBody.id)
         .select();
       assert.strictEqual(fillEvent.length, 1);
@@ -134,10 +134,10 @@ describe('create fill event', () => {
       assert.deepStrictEqual(res.statusCode, 201);
       assert.deepStrictEqual(resBody.price, expectedPrice);
 
-      const fillEvent = await knexController('fill_event')
+      const fillEvent = await getTestKnex()('fill_event')
         .where('id', resBody.id)
         .select();
-      const fillEventGasFills = await knexController('fill_event_gas_fill')
+      const fillEventGasFills = await getTestKnex()('fill_event_gas_fill')
         .where('fill_event_id', resBody.id)
         .select();
       assert.strictEqual(fillEvent.length, 1);
@@ -167,7 +167,7 @@ describe('create fill event', () => {
       assert.deepStrictEqual(resBody.price, 0);
       assert.deepStrictEqual(resBody.compressorId, compressorId);
 
-      const fillEvent = await knexController('fill_event')
+      const fillEvent = await getTestKnex()('fill_event')
         .where('id', resBody.id)
         .select();
 
@@ -178,8 +178,8 @@ describe('create fill event', () => {
 
   describe('unsuccessful', () => {
     afterEach(async () => {
-      const fillEvents = await knexController('fill_event').select();
-      const fillEventGasFills = await knexController(
+      const fillEvents = await getTestKnex()('fill_event').select();
+      const fillEventGasFills = await getTestKnex()(
         'fill_event_gas_fill',
       ).select();
       assert.strictEqual(fillEvents.length, 0);

@@ -13,8 +13,8 @@ import {
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   type CreateStorageCylinderBody,
@@ -44,6 +44,7 @@ const INVALID_PAYLOAD_NON_EXISTENT_GAS: CreateStorageCylinderBody = {
 describe('Create storage cylinder', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -54,7 +55,6 @@ describe('Create storage cylinder', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -95,7 +95,7 @@ describe('Create storage cylinder', () => {
       assert.strictEqual(body.volume, 50);
       assert.ok(body.id);
 
-      const [{ ...dbSC }] = await knexController('storage_cylinder').where(
+      const [{ ...dbSC }] = await getTestKnex()('storage_cylinder').where(
         'id',
         body.id,
       );

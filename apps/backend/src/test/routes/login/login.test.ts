@@ -8,18 +8,19 @@ import {
 } from 'node:test';
 import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
 
 describe('Login', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -30,7 +31,6 @@ describe('Login', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -99,7 +99,7 @@ describe('Login', () => {
       });
       assert.strictEqual(res.statusCode, 200);
 
-      const dbRes = await knexController.raw(`
+      const dbRes = await getTestKnex().raw(`
         SELECT
           email,
           last_login

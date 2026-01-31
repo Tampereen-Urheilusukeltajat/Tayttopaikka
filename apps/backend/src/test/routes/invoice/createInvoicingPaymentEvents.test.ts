@@ -13,14 +13,15 @@ import {
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import { type PaymentEvent } from '../../../types/payment.types';
 
 describe('Create invoicing payment events', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -31,7 +32,6 @@ describe('Create invoicing payment events', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -85,7 +85,7 @@ describe('Create invoicing payment events', () => {
       });
 
       // Check database state
-      const invoiceRows = await knexController('invoice').select([
+      const invoiceRows = await getTestKnex()('invoice').select([
         'payment_event_id',
         'created_by',
       ]);

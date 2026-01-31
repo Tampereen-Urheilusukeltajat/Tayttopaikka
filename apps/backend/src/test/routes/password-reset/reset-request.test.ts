@@ -9,18 +9,19 @@ import {
 } from 'node:test';
 import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
 
 describe('Password reset request', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -40,7 +41,6 @@ describe('Password reset request', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 

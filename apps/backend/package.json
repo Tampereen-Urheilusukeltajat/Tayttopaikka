@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "nodemon",
     "start": "ts-node --transpile-only ./src/app.ts",
-    "test": "tsx --test --test-concurrency=1",
-    "test:coverage": "tsx --test --test-concurrency=1 --experimental-test-coverage",
+    "test": "tsx --test",
+    "test:coverage": "tsx --test --experimental-test-coverage",
     "test:watch": "tsx --test --test-concurrency=1 --watch",
     "lint": "eslint src --max-warnings 0",
     "format": "prettier -c .",

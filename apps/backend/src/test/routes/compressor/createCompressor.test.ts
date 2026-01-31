@@ -13,8 +13,8 @@ import {
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   type CreateCompressorRequestBody,
@@ -30,6 +30,7 @@ const VALID_PAYLOAD: CreateCompressorRequestBody = {
 describe('Create compressor', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -40,7 +41,6 @@ describe('Create compressor', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 

@@ -13,8 +13,8 @@ import {
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import {
   type CreateGasPriceBody,
   type GasWithPricing,
@@ -50,6 +50,7 @@ const INVALID_PAYLOAD_NON_EXISTENT_GAS: CreateGasPriceBody = {
 describe('Create gas price', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -60,7 +61,6 @@ describe('Create gas price', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -101,7 +101,7 @@ describe('Create gas price', () => {
       assert.strictEqual(body.priceEurCents, 4);
       assert.ok(body.gasPriceId);
 
-      const [{ ...dbGP }] = await knexController('gas_price').where(
+      const [{ ...dbGP }] = await getTestKnex()('gas_price').where(
         'id',
         body.gasPriceId,
       );
@@ -112,7 +112,7 @@ describe('Create gas price', () => {
     });
 
     test('responds 201 with undefined active_to parameter and manipulates existing gas price active time range', async () => {
-      const [{ ...dbBeforeUpdatePreviousGP }] = await knexController(
+      const [{ ...dbBeforeUpdatePreviousGP }] = await getTestKnex()(
         'gas_price',
       ).where('id', '1');
 
@@ -133,7 +133,7 @@ describe('Create gas price', () => {
       assert.strictEqual(body.priceEurCents, 7);
       assert.ok(body.gasPriceId);
 
-      const [{ ...dbGP }] = await knexController('gas_price').where(
+      const [{ ...dbGP }] = await getTestKnex()('gas_price').where(
         'id',
         body.gasPriceId,
       );
@@ -143,7 +143,7 @@ describe('Create gas price', () => {
       assert.strictEqual(dbGP.price_eur_cents, 7);
 
       // Make sure it modified the existing gas price and set active_to correctly
-      const [{ ...dbPreviousGP }] = await knexController('gas_price').where(
+      const [{ ...dbPreviousGP }] = await getTestKnex()('gas_price').where(
         'id',
         '1',
       );

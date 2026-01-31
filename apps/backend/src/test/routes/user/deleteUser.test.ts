@@ -8,18 +8,19 @@ import {
 } from 'node:test';
 import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
 
 describe('Delete user', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -30,7 +31,6 @@ describe('Delete user', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -74,7 +74,7 @@ describe('Delete user', () => {
     });
 
     test('it anonymizes user data', async () => {
-      const res = await knexController('user')
+      const res = await getTestKnex()('user')
         .where({ id: delUserId })
         .first(
           'email',
@@ -91,7 +91,7 @@ describe('Delete user', () => {
     });
 
     test('it archives cylinder sets', async (t) => {
-      const res = await knexController('diving_cylinder_set')
+      const res = await getTestKnex()('diving_cylinder_set')
         .where({ owner: delUserId })
         .select('id', 'archived');
       await t.assert.snapshot(res);

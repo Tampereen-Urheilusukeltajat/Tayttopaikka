@@ -8,13 +8,13 @@ import {
 } from 'node:test';
 import assert from 'node:assert';
 // import { type FastifyInstance } from 'fastify';
-import { knexController } from '../../../database/database';
 // import { buildServer } from '../../../server';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
 import bcrypt from 'bcrypt';
 import { type FastifyInstance } from 'fastify';
@@ -31,6 +31,7 @@ const CURRENT_PASSWORD = 'thisIsMyCurrentPassword';
 describe('update user', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -41,7 +42,6 @@ describe('update user', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -128,7 +128,7 @@ describe('update user', () => {
 
       assert.deepStrictEqual(res.statusCode, 200);
 
-      const response = await knexController
+      const response = await getTestKnex()
         .select(['password_hash', 'salt'])
         .from('user')
         .where('id', '1be5abcd-53d4-11ed-9342-0242ac120002');
@@ -137,7 +137,7 @@ describe('update user', () => {
       assert.ok(bcrypt.compareSync(password, response[0].password_hash));
 
       // Restore the original password so subsequent tests work
-      await knexController('user')
+      await getTestKnex()('user')
         .where('id', '1be5abcd-53d4-11ed-9342-0242ac120002')
         .update({
           password_hash:

@@ -13,14 +13,15 @@ import {
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import { type DivingCylinderSet } from '../../../types/divingCylinderSet.types';
 
 describe('delete cylinder set', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
@@ -31,7 +32,6 @@ describe('delete cylinder set', () => {
 
   after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -87,7 +87,7 @@ describe('delete cylinder set', () => {
       );
 
       // Set is archived from diving_cylinder_set
-      const setResponse = await knexController
+      const setResponse = await getTestKnex()
         .select('archived')
         .from<DivingCylinderSet>('diving_cylinder_set')
         .where('id', divingCylinderSetId);
@@ -95,7 +95,7 @@ describe('delete cylinder set', () => {
       assert.strictEqual(setResponse[0].archived, 1);
 
       // only given dc set is archived
-      const response1 = await knexController
+      const response1 = await getTestKnex()
         .select('id')
         .from('diving_cylinder_set')
         .where('archived', 1);

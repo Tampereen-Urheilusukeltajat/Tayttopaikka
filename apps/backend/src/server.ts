@@ -15,6 +15,8 @@ import { type AuthPayload, type AuthUser } from './types/auth.types';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import { getUserWithId } from './lib/queries/user';
+import { setKnexInstance } from './database/database';
+import { type Knex } from 'knex';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (JWT_SECRET === undefined) {
@@ -31,7 +33,12 @@ declare module '@fastify/jwt' {
 
 export const buildServer = async (opts: {
   routePrefix: string;
+  knex?: Knex;
 }): Promise<FastifyInstance> => {
+  // If a custom knex instance is provided (e.g., for testing), use it
+  if (opts.knex !== undefined) {
+    setKnexInstance(opts.knex);
+  }
   const server = fastify({
     logger: process.env.CI ? false : fastifyLogger,
     routerOptions: {
