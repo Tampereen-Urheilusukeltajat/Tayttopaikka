@@ -9,11 +9,10 @@ export const Login: React.FC = () => {
       <header className={styles.header}>
         <h1>Tervetuloa täyttöpaikalle!</h1>
         <p>
-          Täyttöpaikka on Tampereen Urheilusukeltajien uusi täyttöpäiväkirja. Se
-          korvaa vaiheittain paperisen esikuvansa vuoden 2025 aikana.
-          Järjestelmää kehitetään vapaaehtoisvoimin ja sen lähdekoodi on
-          saatavilla vapaasti{' '}
-          <a href="https://github.com/orgs/Tampereen-Urheilusukeltajat/">
+          Täyttöpaikka on Tampereen Urheilusukeltajien uusi, digitaalinen
+          täyttöpäiväkirja. Järjestelmää kehitetään vapaaehtoisvoimin ja sen
+          lähdekoodi on saatavilla vapaasti{' '}
+          <a href="https://github.com/Tampereen-Urheilusukeltajat/Tayttopaikka">
             GitHubissa
           </a>
           .
