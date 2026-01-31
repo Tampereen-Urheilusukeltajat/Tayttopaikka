@@ -22,42 +22,6 @@ This project consists of two main applications:
 - **`frontend`**: React + Vite application with TypeScript
 - **`packages`**: Shared packages (if any)
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-## Tech Stack
-
-### Backend
-
-- **Framework**: Fastify with TypeScript
-- **Database**: MariaDB with Knex.js migrations
-- **Cache**: Redis
-- **Authentication**: JWT with bcrypt
-- **Testing**: Jest
-- **API Documentation**: Swagger/OpenAPI
-
-### Frontend
-
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **UI**: Custom components with SCSS
-- **State Management**: TanStack Query (React Query)
-- **Testing**: Playwright
-
-### DevOps
-
-- **Containerization**: Docker & Docker Compose
-- **Package Manager**: pnpm (v9.0.0)
-- **Monorepo**: Turborepo
-- **Node Version**: >=24.12.0
-
-## Prerequisites
-
-- Node.js >= 24.12.0
-- pnpm >= 9.0.0
-- Docker and Docker Compose (for local development)
-
-## Getting Started
-
 ### Installation
 
 ```bash
@@ -99,70 +63,31 @@ The services will be available at:
 
 ### Environment Variables
 
-Create `.env` files in the respective app directories:
+Create `.env` files in the respective app directories. You will find an example file in each directory.
 
-**Backend** (`apps/backend/.env`):
+## Deployment
 
-```env
-DATABASE_HOST=mariadb
-DATABASE_PORT=3306
-DATABASE_USER=blenderi
-DATABASE_PASSWORD=V3rySecretPasswor4
-DATABASE_NAME=blenderi
-REDIS_HOST=redis
-REDIS_PORT=6379
-JWT_SECRET=your-secret-key
-NODE_ENV=development
+### Automatic Deployment (Recommended)
+
+**Deployments are automatically triggered when changes are pushed to the `main` branch.** The CI/CD pipeline will handle building and deploying both the frontend and backend to Fly.io.
+
+This is the recommended approach for all production deployments to ensure consistency and proper testing.
+
+### Manual Deployment
+
+If you need to deploy manually (for testing or emergency fixes), run the following commands from the repository root:
+
+```bash
+# Deploy frontend
+flyctl deploy --config infra/ui/fly.toml --dockerfile infra/ui/Dockerfile
+
+# Deploy backend
+flyctl deploy --config infra/backend/fly.toml --dockerfile infra/backend/Dockerfile
 ```
 
-**Frontend** (`apps/frontend/.env`):
+**Important:** Always deploy from the repository root directory to ensure the correct build context is used.
 
-```env
-VITE_API_URL=http://localhost:3000
-```
+### Deployment Configuration
 
-## Project Structure
-
-```
-apps/
-├── backend/              # Fastify API server
-│   ├── src/
-│   │   ├── routes/       # API endpoints
-│   │   ├── database/     # Database config & migrations
-│   │   ├── lib/          # Auth, queries, utilities
-│   │   ├── types/        # TypeScript type definitions
-│   │   └── test/         # Jest tests
-│   └── package.json
-├── frontend/             # React application
-│   ├── src/
-│   │   ├── components/   # React components
-│   │   ├── views/        # Page views
-│   │   ├── interfaces/   # TypeScript interfaces
-│   │   └── lib/          # Utilities and helpers
-│   └── package.json
-Dockerfiles/              # Docker build files
-└── packages/             # Shared packages
-```
-
-## Available Scripts
-
-### Root Level
-
-- `pnpm dev` - Run all apps in development mode
-- `pnpm build` - Build all apps
-- `pnpm lint` - Lint all apps
-- `pnpm format` - Format code with Prettier
-- `pnpm check-types` - TypeScript type checking
-
-### Backend
-
-- `pnpm dev` - Start development server with nodemon
-- `pnpm test` - Run Jest tests
-- `pnpm start` - Start production server
-
-### Frontend
-
-- `pnpm dev` - Start Vite dev server
-- `pnpm build` - Build for production
-- `pnpm test` - Run Playwright E2E tests
-- `pnpm serve` - Preview production build
+- Frontend: [infra/ui/fly.toml](infra/ui/fly.toml)
+- Backend: [infra/backend/fly.toml](infra/backend/fly.toml)
