@@ -1,25 +1,25 @@
 # Deployment disabled for now
-# name: Deploy Frontend to Fly.io
-# on:
-#   push:
-#     branches:
-#       - main
-#     paths:
-#       - 'apps/frontend/**'
-#       - 'packages/**'
-#       - 'package.json'
-#       - 'pnpm-lock.yaml'
-#       - '.github/workflows/deploy-frontend.yml'
-#
-# jobs:
-#   deploy:
-#     timeout-minutes: 10
-#     runs-on: ubuntu-latest
-#     concurrency: deploy-frontend
-#     steps:
-#       - uses: actions/checkout@v3
-#       - uses: superfly/flyctl-actions/setup-flyctl@master
-#       - name: Deploy frontend
-#         run: flyctl deploy --remote-only --config infra/ui/fly.toml
-#         env:
-#           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+name: Deploy Frontend to Fly.io
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/frontend/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-frontend.yml"
+
+jobs:
+  deploy:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    concurrency: deploy-frontend
+    steps:
+      - uses: actions/checkout@v3
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy frontend
+        run: flyctl deploy --config infra/ui/fly.toml --dockerfile infra/ui/Dockerfile
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

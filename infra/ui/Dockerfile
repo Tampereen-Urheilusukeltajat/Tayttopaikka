@@ -1,6 +1,6 @@
-FROM node:24.12.0-alpine as build
+FROM node:24.12.0-alpine AS build
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
