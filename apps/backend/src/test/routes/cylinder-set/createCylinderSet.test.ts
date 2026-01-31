@@ -79,23 +79,28 @@ describe('create cylinder set', () => {
     assert.deepStrictEqual(res.statusCode, 201);
     const responseBody = JSON.parse(res.body);
 
-    // remove ids to enable comparison.
-    delete responseBody.id;
-    delete responseBody.cylinders[0].id;
+    // Extract only the fields we want to compare
+    const { id, cylinders, ...restOfResponse } = responseBody;
+    const { id: cylinderId, inspection, ...restOfCylinder } = cylinders[0];
 
     // Check inspection field exists and contains the expected date
-    assert.ok(responseBody.cylinders[0].inspection);
-    assert.ok(
-      responseBody.cylinders[0].inspection.includes(
-        payload.cylinders[0].inspection,
-      ),
-    );
+    assert.ok(inspection);
+    assert.ok(inspection.includes(payload.cylinders[0].inspection));
 
-    // Delete inspection from both for comparison since it has timestamp
-    delete responseBody.cylinders[0].inspection;
-    delete payload.cylinders[0].inspection;
+    // Compare without ids and inspection
+    const normalizedResponse = {
+      ...restOfResponse,
+      cylinders: [restOfCylinder, ...cylinders.slice(1)],
+    };
 
-    assert.deepStrictEqual(responseBody, payload);
+    const { inspection: _inspection, ...payloadCylinder } =
+      payload.cylinders[0];
+    const normalizedPayload = {
+      ...payload,
+      cylinders: [payloadCylinder, ...payload.cylinders.slice(1)],
+    };
+
+    assert.deepStrictEqual(normalizedResponse, normalizedPayload);
   });
 
   test('it responds with 201 and proper body if creation of multiple cylinder set was successful', async () => {
