@@ -107,9 +107,17 @@ export const buildServer = async (opts: {
     })
     .register(fastifyCors, {
       origin: (origin, cb) => {
-        // TODO: Configure CORS
-        cb(null, true);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const allowedOrigins = [frontendUrl];
+
+        if (!origin || allowedOrigins.includes(origin)) {
+          cb(null, true);
+        } else {
+          cb(new Error('Not allowed by CORS'), false);
+        }
       },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     })
     .register(fastifyJwt, {
       secret: JWT_SECRET,
