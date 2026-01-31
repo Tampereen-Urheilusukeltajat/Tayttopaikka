@@ -5,7 +5,14 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'playwright.config.js', 'vite.config.ts', 'vite-env.d.ts'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      'playwright.config.js',
+      'vite.config.ts',
+      'vite-env.d.ts',
+    ],
   },
   {
     files: ['**/*.ts', '**/*.tsx'],
@@ -23,7 +30,7 @@ export default [
     },
     rules: {
       'no-console': 'warn',
-      'semi': ['error', 'always'],
+      semi: ['error', 'always'],
       '@typescript-eslint/semi': ['error', 'always'],
       'return-await': 'off',
       '@typescript-eslint/return-await': ['error', 'never'],

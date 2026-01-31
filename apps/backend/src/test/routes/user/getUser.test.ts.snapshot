@@ -1,0 +1,14 @@
+exports[`Get user > User is found > it returns 200 and has right properties 1`] = `
+{
+  "id": "1be5abcd-53d4-11ed-9342-0242ac120002",
+  "email": "test@email.fi",
+  "phoneNumber": "00001",
+  "forename": "Tester",
+  "surname": "Blender",
+  "isUser": true,
+  "isAdmin": true,
+  "isBlender": true,
+  "isAdvancedBlender": false,
+  "isInstructor": false
+}
+`;

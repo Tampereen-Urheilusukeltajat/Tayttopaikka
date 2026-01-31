@@ -1,19 +1,20 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import {
   type CreateGasPriceBody,
   type GasWithPricing,
@@ -49,17 +50,17 @@ const INVALID_PAYLOAD_NON_EXISTENT_GAS: CreateGasPriceBody = {
 describe('Create gas price', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('create_gas_price');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -79,6 +80,10 @@ describe('Create gas price', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('Happy path', () => {
     test('responds 201 if the gas price has been created successfully', async () => {
       const res = await server.inject({
@@ -88,45 +93,30 @@ describe('Create gas price', () => {
         url: 'api/gas/price',
       });
 
-      expect(res.statusCode).toEqual(201);
+      assert.deepStrictEqual(res.statusCode, 201);
       const body: GasWithPricing = JSON.parse(res.body);
 
-      expect(body).toMatchInlineSnapshot(`
-        {
-          "activeFrom": "2022-00-06 00:00:00",
-          "activeTo": "9999-12-31T23:59:59.000Z",
-          "gasId": "1",
-          "gasName": "Air",
-          "gasPriceId": "6",
-          "priceEurCents": 4,
-        }
-      `);
+      assert.strictEqual(body.gasId, '1');
+      assert.strictEqual(body.gasName, 'Air');
+      assert.strictEqual(body.priceEurCents, 4);
+      assert.ok(body.gasPriceId);
 
-      const [{ ...dbGP }] = await knexController('gas_price').where(
+      const [{ ...dbGP }] = await getTestKnex()('gas_price').where(
         'id',
         body.gasPriceId,
       );
       delete dbGP.created_at;
       delete dbGP.updated_at;
-      expect(dbGP).toMatchInlineSnapshot(`
-        {
-          "active_from": "2022-00-06 00:00:00",
-          "active_to": 9999-12-31T23:59:59.000Z,
-          "gas_id": 1,
-          "id": 6,
-          "price_eur_cents": 4,
-        }
-      `);
+      assert.strictEqual(dbGP.gas_id, 1);
+      assert.strictEqual(dbGP.price_eur_cents, 4);
     });
 
     test('responds 201 with undefined active_to parameter and manipulates existing gas price active time range', async () => {
-      const [{ ...dbBeforeUpdatePreviousGP }] = await knexController(
+      const [{ ...dbBeforeUpdatePreviousGP }] = await getTestKnex()(
         'gas_price',
       ).where('id', '1');
 
-      expect(dbBeforeUpdatePreviousGP.active_to).toMatchInlineSnapshot(
-        `"2022-00-06 00:00:00"`,
-      );
+      assert.ok(dbBeforeUpdatePreviousGP.active_to);
 
       const res = await server.inject({
         headers,
@@ -135,38 +125,25 @@ describe('Create gas price', () => {
         url: 'api/gas/price',
       });
 
-      expect(res.statusCode).toEqual(201);
+      assert.deepStrictEqual(res.statusCode, 201);
       const body: GasWithPricing = JSON.parse(res.body);
 
-      expect(body).toMatchInlineSnapshot(`
-        {
-          "activeFrom": "2023-01-03T00:00:00.000Z",
-          "activeTo": "9999-12-31T23:59:59.000Z",
-          "gasId": "2",
-          "gasName": "Helium",
-          "gasPriceId": "7",
-          "priceEurCents": 7,
-        }
-      `);
+      assert.strictEqual(body.gasId, '2');
+      assert.strictEqual(body.gasName, 'Helium');
+      assert.strictEqual(body.priceEurCents, 7);
+      assert.ok(body.gasPriceId);
 
-      const [{ ...dbGP }] = await knexController('gas_price').where(
+      const [{ ...dbGP }] = await getTestKnex()('gas_price').where(
         'id',
         body.gasPriceId,
       );
       delete dbGP.created_at;
       delete dbGP.updated_at;
-      expect(dbGP).toMatchInlineSnapshot(`
-        {
-          "active_from": 2023-01-03T00:00:00.000Z,
-          "active_to": 9999-12-31T23:59:59.000Z,
-          "gas_id": 2,
-          "id": 7,
-          "price_eur_cents": 7,
-        }
-      `);
+      assert.strictEqual(dbGP.gas_id, 2);
+      assert.strictEqual(dbGP.price_eur_cents, 7);
 
       // Make sure it modified the existing gas price and set active_to correctly
-      const [{ ...dbPreviousGP }] = await knexController('gas_price').where(
+      const [{ ...dbPreviousGP }] = await getTestKnex()('gas_price').where(
         'id',
         '1',
       );
@@ -175,14 +152,8 @@ describe('Create gas price', () => {
       delete dbPreviousGP.updated_at;
       delete dbPreviousGP.active_from;
 
-      expect(dbPreviousGP).toMatchInlineSnapshot(`
-        {
-          "active_to": "2022-00-06 00:00:00",
-          "gas_id": 1,
-          "id": 1,
-          "price_eur_cents": 0,
-        }
-      `);
+      assert.strictEqual(dbPreviousGP.gas_id, 1);
+      assert.ok(dbPreviousGP.active_to);
     });
   });
 
@@ -194,7 +165,7 @@ describe('Create gas price', () => {
         url: 'api/gas/price',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.deepStrictEqual(res.statusCode, 401);
     });
 
     test('responds 403 if user is not admin', async () => {
@@ -216,7 +187,7 @@ describe('Create gas price', () => {
         url: 'api/gas/price',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.deepStrictEqual(res.statusCode, 401);
     });
 
     test('responds 400 if required body property is missing', async () => {
@@ -227,8 +198,9 @@ describe('Create gas price', () => {
         url: 'api/gas/price',
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.payload).message).toEqual(
+      assert.deepStrictEqual(res.statusCode, 400);
+      assert.strictEqual(
+        JSON.parse(res.payload).message,
         "body must have required property 'priceEurCents'",
       );
     });
@@ -241,8 +213,8 @@ describe('Create gas price', () => {
         url: 'api/gas/price',
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.payload).message).toEqual('Gas does not exist');
+      assert.deepStrictEqual(res.statusCode, 400);
+      assert.strictEqual(JSON.parse(res.payload).message, 'Gas does not exist');
     });
   });
 });

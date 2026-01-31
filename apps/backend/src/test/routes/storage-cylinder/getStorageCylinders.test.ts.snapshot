@@ -1,0 +1,32 @@
+exports[`Get storage cylinders > Happy path > responds with the storage cylinders and with the 200 status 1`] = `
+[
+  {
+    "id": "1",
+    "gasId": "2",
+    "name": "1",
+    "maxPressure": 200,
+    "volume": 50
+  },
+  {
+    "id": "2",
+    "gasId": "3",
+    "name": "1",
+    "maxPressure": 200,
+    "volume": 50
+  },
+  {
+    "id": "3",
+    "gasId": "4",
+    "name": "1",
+    "maxPressure": 200,
+    "volume": 50
+  },
+  {
+    "id": "4",
+    "gasId": "5",
+    "name": "1",
+    "maxPressure": 200,
+    "volume": 24
+  }
+]
+`;

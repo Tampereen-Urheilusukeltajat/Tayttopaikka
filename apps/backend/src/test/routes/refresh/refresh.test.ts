@@ -1,36 +1,36 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
 
 describe('Refresh', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('auth');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -46,9 +46,13 @@ describe('Refresh', () => {
         password: 'password',
       },
     });
-    expect(res.statusCode).toEqual(200);
+    assert.strictEqual(res.statusCode, 200);
     const tokens = JSON.parse(res.body);
     refreshToken = String(tokens.refreshToken);
+  });
+
+  afterEach(async () => {
+    await server.close();
   });
 
   describe('Happy path', () => {
@@ -60,11 +64,11 @@ describe('Refresh', () => {
           refreshToken,
         },
       });
-      expect(res.statusCode).toEqual(200);
+      assert.strictEqual(res.statusCode, 200);
       const resBody = JSON.parse(res.body);
-      expect(resBody).toHaveProperty('accessToken');
-      expect(resBody).toHaveProperty('refreshToken');
-      expect(resBody.refreshToken).not.toEqual(refreshToken);
+      assert.ok('accessToken' in resBody);
+      assert.ok('refreshToken' in resBody);
+      assert.notStrictEqual(resBody.refreshToken, refreshToken);
     });
   });
   describe('Unhappy path', () => {
@@ -78,10 +82,10 @@ describe('Refresh', () => {
         },
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.strictEqual(res.statusCode, 401);
       const resBody = JSON.parse(res.body);
-      expect(resBody).not.toHaveProperty('accessToken');
-      expect(resBody).not.toHaveProperty('refreshToken');
+      assert.ok(!('accessToken' in resBody));
+      assert.ok(!('refreshToken' in resBody));
     });
 
     test('It returns 400 for invalid body', async () => {
@@ -90,10 +94,10 @@ describe('Refresh', () => {
         method: 'POST',
         payload: {},
       });
-      expect(res.statusCode).toEqual(400);
+      assert.strictEqual(res.statusCode, 400);
       const resBody = JSON.parse(res.body);
-      expect(resBody).not.toHaveProperty('accessToken');
-      expect(resBody).not.toHaveProperty('refreshToken');
+      assert.ok(!('accessToken' in resBody));
+      assert.ok(!('refreshToken' in resBody));
     });
 
     test('It returns 401 if refreshToken is used as accesstoken', async () => {
@@ -104,10 +108,10 @@ describe('Refresh', () => {
           Authorization: 'Bearer ' + String(refreshToken),
         },
       });
-      expect(res.statusCode).toEqual(401);
+      assert.strictEqual(res.statusCode, 401);
       const resBody = JSON.parse(res.body);
-      expect(resBody).not.toHaveProperty('id');
-      expect(resBody).not.toHaveProperty('email');
+      assert.ok(!('id' in resBody));
+      assert.ok(!('email' in resBody));
     });
   });
 });

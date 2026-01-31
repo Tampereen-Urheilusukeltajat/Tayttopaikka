@@ -1,37 +1,36 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
+  before,
+  after,
   beforeEach,
-  afterAll,
   afterEach,
-} from '@jest/globals';
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 
 describe('create fill event', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('create_fill_event');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -51,11 +50,15 @@ describe('create fill event', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('successful', () => {
-    afterAll(async () => {
+    after(async () => {
       // delete successful fill events
-      await knexController('fill_event_gas_fill').del();
-      await knexController('fill_event').del();
+      await getTestKnex()('fill_event_gas_fill').del();
+      await getTestKnex()('fill_event').del();
     });
 
     test('it creates a new fill event with only compressed air', async () => {
@@ -74,17 +77,17 @@ describe('create fill event', () => {
       });
 
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(201);
-      expect(resBody.price).toEqual(0);
+      assert.deepStrictEqual(res.statusCode, 201);
+      assert.deepStrictEqual(resBody.price, 0);
 
-      const fillEvent = await knexController('fill_event')
+      const fillEvent = await getTestKnex()('fill_event')
         .where('id', resBody.id)
         .select();
-      const fillEventGasFills = await knexController('fill_event_gas_fill')
+      const fillEventGasFills = await getTestKnex()('fill_event_gas_fill')
         .where('fill_event_id', resBody.id)
         .select();
-      expect(fillEvent).toHaveLength(1);
-      expect(fillEventGasFills).toHaveLength(1);
+      assert.strictEqual(fillEvent.length, 1);
+      assert.strictEqual(fillEventGasFills.length, 1);
     });
 
     test('it creates a new fill event with blender privileges', async () => {
@@ -128,17 +131,17 @@ describe('create fill event', () => {
       //   ) *
       //     50 *
       //     150;
-      expect(res.statusCode).toEqual(201);
-      expect(resBody.price).toEqual(expectedPrice);
+      assert.deepStrictEqual(res.statusCode, 201);
+      assert.deepStrictEqual(resBody.price, expectedPrice);
 
-      const fillEvent = await knexController('fill_event')
+      const fillEvent = await getTestKnex()('fill_event')
         .where('id', resBody.id)
         .select();
-      const fillEventGasFills = await knexController('fill_event_gas_fill')
+      const fillEventGasFills = await getTestKnex()('fill_event_gas_fill')
         .where('fill_event_id', resBody.id)
         .select();
-      expect(fillEvent).toHaveLength(1);
-      expect(fillEventGasFills).toHaveLength(2);
+      assert.strictEqual(fillEvent.length, 1);
+      assert.strictEqual(fillEventGasFills.length, 2);
     });
 
     test('it can link compressor to the fill event', async () => {
@@ -160,27 +163,27 @@ describe('create fill event', () => {
       });
 
       const resBody = JSON.parse(res.body);
-      expect(res.statusCode).toEqual(201);
-      expect(resBody.price).toEqual(0);
-      expect(resBody.compressorId).toEqual(compressorId);
+      assert.deepStrictEqual(res.statusCode, 201);
+      assert.deepStrictEqual(resBody.price, 0);
+      assert.deepStrictEqual(resBody.compressorId, compressorId);
 
-      const fillEvent = await knexController('fill_event')
+      const fillEvent = await getTestKnex()('fill_event')
         .where('id', resBody.id)
         .select();
 
-      expect(fillEvent).toHaveLength(1);
-      expect(fillEvent[0].compressor_id).toEqual(compressorId);
+      assert.strictEqual(fillEvent.length, 1);
+      assert.deepStrictEqual(fillEvent[0].compressor_id, compressorId);
     });
   });
 
   describe('unsuccessful', () => {
     afterEach(async () => {
-      const fillEvents = await knexController('fill_event').select();
-      const fillEventGasFills = await knexController(
+      const fillEvents = await getTestKnex()('fill_event').select();
+      const fillEventGasFills = await getTestKnex()(
         'fill_event_gas_fill',
       ).select();
-      expect(fillEvents).toHaveLength(0);
-      expect(fillEventGasFills).toHaveLength(0);
+      assert.strictEqual(fillEvents.length, 0);
+      assert.strictEqual(fillEventGasFills.length, 0);
     });
 
     test('it fails when no gases are given', async () => {
@@ -198,9 +201,9 @@ describe('create fill event', () => {
         body: PAYLOAD,
         headers,
       });
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
       const body = JSON.parse(res.body);
-      expect(body.message).toEqual('No gases were given');
+      assert.deepStrictEqual(body.message, 'No gases were given');
     });
 
     test('it fails with invalid cylinder set', async () => {
@@ -218,9 +221,9 @@ describe('create fill event', () => {
         body: PAYLOAD,
         headers,
       });
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
       const body = JSON.parse(res.body);
-      expect(body.message).toEqual('Cylinder set was not found');
+      assert.deepStrictEqual(body.message, 'Cylinder set was not found');
     });
 
     test('it fails with negative storageCylinder pressure', async () => {
@@ -244,9 +247,12 @@ describe('create fill event', () => {
         body: PAYLOAD,
         headers,
       });
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
       const body = JSON.parse(res.body);
-      expect(body.message).toEqual('Cannot have negative fill pressure');
+      assert.deepStrictEqual(
+        body.message,
+        'Cannot have negative fill pressure',
+      );
     });
 
     test('it fails when the request price is not right', async () => {
@@ -270,9 +276,12 @@ describe('create fill event', () => {
         body: PAYLOAD,
         headers,
       });
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
       const body = JSON.parse(res.body);
-      expect(body.message).toEqual('Client price did not match server price');
+      assert.deepStrictEqual(
+        body.message,
+        'Client price did not match server price',
+      );
     });
 
     test('it fails if the user does not have blender privileges', async () => {
@@ -305,7 +314,7 @@ describe('create fill event', () => {
         body: PAYLOAD,
         headers,
       });
-      expect(res.statusCode).toEqual(403);
+      assert.deepStrictEqual(res.statusCode, 403);
     });
   });
 });

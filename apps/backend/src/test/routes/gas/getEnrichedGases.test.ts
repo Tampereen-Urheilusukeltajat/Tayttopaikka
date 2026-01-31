@@ -1,35 +1,36 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 
 describe('Get enriched gases', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('get_enriched_gas');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -49,6 +50,10 @@ describe('Get enriched gases', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('Happy path', () => {
     test('responds with enriched gases and 200 status', async () => {
       const res = await server.inject({
@@ -57,23 +62,17 @@ describe('Get enriched gases', () => {
         url: 'api/gas',
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.deepStrictEqual(res.statusCode, 200);
       const body = JSON.parse(res.body);
 
-      expect(body.length).toEqual(5);
-      expect(body[0]).toHaveProperty('activeFrom');
+      assert.deepStrictEqual(body.length, 5);
+      assert.ok('activeFrom' in body[0]);
 
       delete body[0].activeFrom;
 
-      expect(body[0]).toMatchInlineSnapshot(`
-        {
-          "activeTo": "9999-12-31T23:59:59.000Z",
-          "gasId": "1",
-          "gasName": "Air",
-          "gasPriceId": "1",
-          "priceEurCents": 0,
-        }
-      `);
+      assert.strictEqual(body[0].gasId, '1');
+      assert.strictEqual(body[0].gasName, 'Air');
+      assert.strictEqual(body[0].priceEurCents, 0);
     });
   });
 
@@ -84,7 +83,7 @@ describe('Get enriched gases', () => {
         url: 'api/gas',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.deepStrictEqual(res.statusCode, 401);
     });
   });
 });

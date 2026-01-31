@@ -19,11 +19,11 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tseslint,
-      'import': importPlugin,
+      import: importPlugin,
     },
     rules: {
       'no-console': 'warn',
-      'semi': ['error', 'always'],
+      semi: ['error', 'always'],
       '@typescript-eslint/semi': ['error', 'always'],
       'return-await': 'off',
       '@typescript-eslint/return-await': ['error', 'never'],

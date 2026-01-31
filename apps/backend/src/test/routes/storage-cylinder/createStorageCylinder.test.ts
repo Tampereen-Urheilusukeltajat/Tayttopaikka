@@ -1,19 +1,20 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   type CreateStorageCylinderBody,
@@ -43,17 +44,17 @@ const INVALID_PAYLOAD_NON_EXISTENT_GAS: CreateStorageCylinderBody = {
 describe('Create storage cylinder', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('create_storage_cylinder');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -73,6 +74,10 @@ describe('Create storage cylinder', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('Happy path', () => {
     test('responds 201 if the storageCylinder has been created successfully', async () => {
       const res = await server.inject({
@@ -82,34 +87,23 @@ describe('Create storage cylinder', () => {
         url: 'api/storage-cylinder',
       });
 
-      expect(res.statusCode).toEqual(201);
+      assert.deepStrictEqual(res.statusCode, 201);
       const body: StorageCylinder = JSON.parse(res.body);
 
-      expect(body).toMatchInlineSnapshot(`
-        {
-          "gasId": "1",
-          "id": "1",
-          "maxPressure": 200,
-          "name": "1",
-          "volume": 50,
-        }
-      `);
+      assert.strictEqual(body.gasId, '1');
+      assert.strictEqual(body.maxPressure, 200);
+      assert.strictEqual(body.volume, 50);
+      assert.ok(body.id);
 
-      const [{ ...dbSC }] = await knexController('storage_cylinder').where(
+      const [{ ...dbSC }] = await getTestKnex()('storage_cylinder').where(
         'id',
         body.id,
       );
       delete dbSC.created_at;
       delete dbSC.updated_at;
-      expect(dbSC).toMatchInlineSnapshot(`
-        {
-          "gas_id": 1,
-          "id": 1,
-          "max_pressure": 200,
-          "name": "1",
-          "volume": 50,
-        }
-      `);
+      assert.strictEqual(dbSC.gas_id, 1);
+      assert.strictEqual(dbSC.max_pressure, 200);
+      assert.strictEqual(dbSC.volume, 50);
     });
   });
 
@@ -121,7 +115,7 @@ describe('Create storage cylinder', () => {
         url: 'api/storage-cylinder',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.deepStrictEqual(res.statusCode, 401);
     });
 
     test('responds 400 if required body property is missing', async () => {
@@ -132,8 +126,9 @@ describe('Create storage cylinder', () => {
         url: 'api/storage-cylinder',
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.payload).message).toEqual(
+      assert.deepStrictEqual(res.statusCode, 400);
+      assert.strictEqual(
+        JSON.parse(res.payload).message,
         "body must have required property 'maxPressure'",
       );
     });
@@ -146,8 +141,8 @@ describe('Create storage cylinder', () => {
         url: 'api/storage-cylinder',
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.payload).message).toEqual('Gas does not exist');
+      assert.deepStrictEqual(res.statusCode, 400);
+      assert.strictEqual(JSON.parse(res.payload).message, 'Gas does not exist');
     });
 
     test('responds 403 if user is not an admin', async () => {
@@ -169,8 +164,8 @@ describe('Create storage cylinder', () => {
         url: 'api/storage-cylinder',
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.payload).message).toEqual('Gas does not exist');
+      assert.deepStrictEqual(res.statusCode, 400);
+      assert.strictEqual(JSON.parse(res.payload).message, 'Gas does not exist');
     });
   });
 });

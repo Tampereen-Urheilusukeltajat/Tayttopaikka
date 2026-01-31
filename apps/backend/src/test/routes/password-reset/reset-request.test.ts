@@ -1,48 +1,56 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-  jest,
-} from '@jest/globals';
+  afterEach,
+  mock,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { validateTurnstileToken } from '../../../lib/auth/turnstile';
-
-// Mock the fetch function
-jest.mock('../../../lib/auth/turnstile');
 
 describe('Password reset request', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('password_reset');
     await startRedisConnection();
-    // @ts-expect-error One word: perkele
-    validateTurnstileToken.mockResolvedValue(true);
+    // Mock fetch to simulate successful turnstile validation
+    mock.method(
+      global,
+      'fetch',
+      async () =>
+        ({
+          json: async () => ({ success: true }),
+        }) as any,
+    );
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
   let server;
   beforeEach(async () => {
     server = await getTestInstance();
+  });
+
+  afterEach(async () => {
+    await server.close();
   });
 
   test('It returns 202 for existing user', async () => {
@@ -56,7 +64,7 @@ describe('Password reset request', () => {
       },
     });
 
-    expect(res.statusCode).toEqual(202);
+    assert.strictEqual(res.statusCode, 202);
   });
 
   test('It returns 202 for nonexistent user', async () => {
@@ -70,6 +78,6 @@ describe('Password reset request', () => {
       },
     });
 
-    expect(res.statusCode).toEqual(202);
+    assert.strictEqual(res.statusCode, 202);
   });
 });

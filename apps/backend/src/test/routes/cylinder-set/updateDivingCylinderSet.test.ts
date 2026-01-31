@@ -1,36 +1,36 @@
- 
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 
 describe('update cylinder set', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('update_cylinder_set');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -50,6 +50,10 @@ describe('update cylinder set', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('happy paths', () => {
     test('it responds with 200 and proper body if update was successful; no cylinders updated', async () => {
       const payload = {
@@ -63,9 +67,9 @@ describe('update cylinder set', () => {
         payload,
       });
 
-      expect(res.statusCode).toEqual(200);
+      assert.deepStrictEqual(res.statusCode, 200);
       const responseBody = JSON.parse(res.body);
-      expect(responseBody.name).toEqual(payload.name);
+      assert.deepStrictEqual(responseBody.name, payload.name);
     });
 
     test('it responds with 200 and proper body if update of multiple cylinder in a set was successful', async () => {
@@ -92,15 +96,15 @@ describe('update cylinder set', () => {
 
       const responseBody = JSON.parse(res.body);
 
-      expect(res.statusCode).toEqual(200);
+      assert.deepStrictEqual(res.statusCode, 200);
 
       for (const cylinder of responseBody.cylinders) {
         if (cylinder.id === '1e54c95c-c2fe-4d86-9406-c88f45c0bde9') {
-          expect(cylinder.pressure).toEqual(232);
-          expect(cylinder.inspection).toContain('2022-01-01');
+          assert.deepStrictEqual(cylinder.pressure, 232);
+          assert.ok(cylinder.inspection.includes('2022-01-01'));
         }
         if (cylinder.id === '362ab1b8-4f88-11ed-aa8f-a7bc5ca309a3') {
-          expect(cylinder.inspection).toContain('2021-01-03');
+          assert.ok(cylinder.inspection.includes('2021-01-03'));
         }
       }
     });
@@ -120,7 +124,7 @@ describe('update cylinder set', () => {
         payload,
       });
 
-      expect(res.statusCode).toEqual(404);
+      assert.deepStrictEqual(res.statusCode, 404);
     });
 
     test('it responds with 400 for invalid body', async () => {
@@ -140,7 +144,7 @@ describe('update cylinder set', () => {
         payload,
       });
 
-      expect(res.statusCode).toEqual(400);
+      assert.deepStrictEqual(res.statusCode, 400);
     });
 
     test('it responds with 401 if request is unauthenticated', async () => {
@@ -156,10 +160,13 @@ describe('update cylinder set', () => {
         headers: { Authorization: 'Bearer definitely not valid jwt token' },
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.deepStrictEqual(res.statusCode, 401);
       const responseBody = JSON.parse(res.body);
 
-      expect(responseBody).toEqual({ statusCode: 401, error: 'Unauthorized' });
+      assert.deepStrictEqual(responseBody, {
+        statusCode: 401,
+        error: 'Unauthorized',
+      });
     });
 
     test('it responds with 404 if user tries to update someone elses diving cylinder set', async () => {
@@ -174,7 +181,7 @@ describe('update cylinder set', () => {
         payload,
       });
 
-      expect(res.statusCode).toEqual(404);
+      assert.deepStrictEqual(res.statusCode, 404);
     });
   });
 });

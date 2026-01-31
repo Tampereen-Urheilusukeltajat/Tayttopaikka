@@ -1,4 +1,5 @@
-import { describe, test, expect } from '@jest/globals';
+import { describe, test } from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import { type HeartbeatResponse } from '../../../routes/utils/heartbeat';
 import { buildServer } from '../../../server';
@@ -16,11 +17,11 @@ describe('heartbeat', () => {
       url: 'api/utils/heartbeat',
     });
 
-    expect(res.statusCode).toEqual(200);
+    assert.strictEqual(res.statusCode, 200);
 
     const resBody = JSON.parse(res.body) as HeartbeatResponse;
-    expect(resBody).toHaveProperty('status');
-    expect(resBody).toHaveProperty('date');
-    expect(resBody.status).toEqual('OK');
+    assert.ok('status' in resBody);
+    assert.ok('date' in resBody);
+    assert.strictEqual(resBody.status, 'OK');
   });
 });

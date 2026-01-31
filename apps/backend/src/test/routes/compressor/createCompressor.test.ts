@@ -1,19 +1,20 @@
 import {
   describe,
   test,
-  expect,
-  beforeAll,
-  afterAll,
+  before,
+  after,
   beforeEach,
-} from '@jest/globals';
+  afterEach,
+} from 'node:test';
+import assert from 'node:assert';
 import { type FastifyInstance } from 'fastify';
 import {
   createTestDatabase,
   dropTestDatabase,
   startRedisConnection,
   stopRedisConnection,
+  getTestKnex,
 } from '../../../lib/utils/testUtils';
-import { knexController } from '../../../database/database';
 import { buildServer } from '../../../server';
 import {
   type CreateCompressorRequestBody,
@@ -29,17 +30,17 @@ const VALID_PAYLOAD: CreateCompressorRequestBody = {
 describe('Create compressor', () => {
   const getTestInstance = async (): Promise<FastifyInstance> =>
     buildServer({
+      knex: getTestKnex(),
       routePrefix: 'api',
     });
 
-  beforeAll(async () => {
+  before(async () => {
     await createTestDatabase('create_compressor');
     await startRedisConnection();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await dropTestDatabase();
-    await knexController.destroy();
     await stopRedisConnection();
   });
 
@@ -59,6 +60,10 @@ describe('Create compressor', () => {
     headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
   });
 
+  afterEach(async () => {
+    await server.close();
+  });
+
   describe('Happy path', () => {
     test('responds 201 if the compressor has been created successfully', async () => {
       const res = await server.inject({
@@ -68,12 +73,12 @@ describe('Create compressor', () => {
         url: 'api/compressor',
       });
 
-      expect(res.statusCode).toEqual(201);
+      assert.strictEqual(res.statusCode, 201);
       const body: Compressor = JSON.parse(res.body);
 
-      expect(body.name).toEqual(VALID_PAYLOAD.name);
-      expect(body.description).toEqual(VALID_PAYLOAD.description);
-      expect(body.isEnabled).toEqual(true);
+      assert.strictEqual(body.name, VALID_PAYLOAD.name);
+      assert.strictEqual(body.description, VALID_PAYLOAD.description);
+      assert.strictEqual(body.isEnabled, true);
     });
   });
 
@@ -85,7 +90,7 @@ describe('Create compressor', () => {
         url: 'api/compressor',
       });
 
-      expect(res.statusCode).toEqual(401);
+      assert.strictEqual(res.statusCode, 401);
     });
 
     test('responds 400 if required body property is missing', async () => {
@@ -96,8 +101,9 @@ describe('Create compressor', () => {
         url: 'api/compressor',
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.payload).message).toEqual(
+      assert.strictEqual(res.statusCode, 400);
+      assert.strictEqual(
+        JSON.parse(res.payload).message,
         "body must have required property 'description'",
       );
     });
@@ -114,8 +120,9 @@ describe('Create compressor', () => {
         url: 'api/compressor',
       });
 
-      expect(res.statusCode).toEqual(400);
-      expect(JSON.parse(res.payload).message).toEqual(
+      assert.strictEqual(res.statusCode, 400);
+      assert.strictEqual(
+        JSON.parse(res.payload).message,
         'body/name must NOT have more than 32 characters',
       );
     });

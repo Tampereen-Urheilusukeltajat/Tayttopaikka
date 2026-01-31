@@ -1,0 +1,57 @@
+exports[`get cylinder sets > returns users diving cylinder sets 1`] = `
+[
+  {
+    "id": "a4e1035e-f36e-4056-9a1b-5925a3c5793e",
+    "owner": "a59faf66-4f75-11ed-98ae-77941df77788",
+    "name": "aa",
+    "cylinders": [
+      {
+        "id": "a62ab1b8-4f88-11ed-aa8f-a7bc5ca309a3",
+        "volume": 10,
+        "pressure": 200,
+        "material": "carbon fiber",
+        "serialNumber": "aa",
+        "inspection": "2010-11-11T00:00:00.000Z"
+      }
+    ]
+  },
+  {
+    "id": "b4e1035e-f36e-4056-9a1b-5925a3c5793e",
+    "owner": "a59faf66-4f75-11ed-98ae-77941df77788",
+    "name": "bb",
+    "cylinders": [
+      {
+        "id": "b62ab1b8-4f88-11ed-aa8f-a7bc5ca309a3",
+        "volume": 10,
+        "pressure": 200,
+        "material": "carbon fiber",
+        "serialNumber": "bb",
+        "inspection": "2010-11-11T00:00:00.000Z"
+      }
+    ]
+  },
+  {
+    "id": "f4e1035e-f36e-4056-9a1b-5925a3c5793e",
+    "owner": "a59faf66-4f75-11ed-98ae-77941df77788",
+    "name": "pullonnimi",
+    "cylinders": [
+      {
+        "id": "1e54c95c-c2fe-4d86-9406-c88f45c0bde9",
+        "volume": 10,
+        "pressure": 200,
+        "material": "steel",
+        "serialNumber": "koodi",
+        "inspection": "2010-11-11T00:00:00.000Z"
+      },
+      {
+        "id": "362ab1b8-4f88-11ed-aa8f-a7bc5ca309a3",
+        "volume": 10,
+        "pressure": 200,
+        "material": "carbon fiber",
+        "serialNumber": "toinenkoodi",
+        "inspection": "2010-11-11T00:00:00.000Z"
+      }
+    ]
+  }
+]
+`;
