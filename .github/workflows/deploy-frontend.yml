@@ -20,6 +20,6 @@
 #       - uses: actions/checkout@v3
 #       - uses: superfly/flyctl-actions/setup-flyctl@master
 #       - name: Deploy frontend
-#         run: flyctl deploy --remote-only --config apps/frontend/fly.toml
+#         run: flyctl deploy --remote-only --config infra/ui/fly.toml
 #         env:
 #           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
