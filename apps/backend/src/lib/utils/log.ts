@@ -2,78 +2,42 @@ import { createLogger, format, type Logger, transports } from 'winston';
 
 const { combine, timestamp, printf, colorize, errors } = format;
 
-// Custom format for cleaner, more readable logs
+/**
+ * Convert any value to a short, readable string.
+ * Objects are JSON‑stringified; Errors become “ErrorName: message”.
+ */
+export const stringifyInline = (obj: unknown): string => {
+  if (obj === null) return 'null';
+  if (obj === undefined) return 'undefined';
+  if (typeof obj === 'string') return obj;
+  if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
+  if (obj instanceof Error) return `${obj.name}: ${obj.message}`;
+  if (typeof obj === 'object') return JSON.stringify(obj);
+  return String(obj);
+};
+
 const customFormat = printf(({ level, message, timestamp, ...metadata }) => {
-  let msg = `${String(timestamp)} [${String(level)}]: ${String(message)}`;
+  const base = `${timestamp} [${level}]: ${message}`;
 
-  // Add metadata if present
-  const metadataKeys = Object.keys(metadata);
-  if (metadataKeys.length > 0) {
-    // Filter out Symbol keys and internal winston properties
-    const filteredMetadata: Record<string, unknown> = Object.keys(metadata)
-      .filter((key) => !key.startsWith('Symbol') && key !== 'level')
-      .reduce<Record<string, unknown>>((obj, key) => {
-        obj[key] = metadata[key];
-        return obj;
-      }, {});
+  // Filter out Symbol‑prefixed keys and the built‑in level field
+  const filteredKeys = Object.keys(metadata).filter(
+    (k) => !k.startsWith('Symbol') && k !== 'level',
+  );
 
-    if (Object.keys(filteredMetadata).length > 0) {
-      msg += `\n${JSON.stringify(filteredMetadata, null, 2)}`;
-    }
-  }
+  if (filteredKeys.length === 0) return base;
 
-  return msg;
+  const metaStr = filteredKeys
+    .map((k) => `${k}=${stringifyInline((metadata as any)[k])}`)
+    .join(' ');
+  return `${base} ${metaStr}`;
 });
 
 export const log: Logger = createLogger({
   format: combine(
-    errors({ stack: true }),
+    errors({ stack: true }), // Preserve error stacks
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     colorize(),
     customFormat,
   ),
   transports: [new transports.Console()],
 });
-
-// Fastify-compatible logger adapter
-export const fastifyLogger = {
-  level: process.env.LOG_LEVEL ?? 'info',
-  stream: {
-    write: (message: string) => {
-      // Parse Fastify's JSON log format and log with winston
-      try {
-        const logObj = JSON.parse(message);
-        const { level, msg, req, res, responseTime, ...rest } = logObj;
-
-        // Map pino levels to winston levels
-        const levelMap: Record<number, string> = {
-          10: 'debug',
-          20: 'debug',
-          30: 'info',
-          40: 'warn',
-          50: 'error',
-          60: 'error',
-        };
-
-        const winstonLevel = levelMap[level] || 'info';
-
-        // Format request/response info
-        let formattedMsg = msg;
-        if (req && res) {
-          formattedMsg = `${req.method} ${req.url} - ${res.statusCode} [${responseTime}ms]`;
-        }
-
-        // Log with winston
-        log[winstonLevel as keyof Logger](formattedMsg, {
-          ...(req && { method: req.method, url: req.url }),
-          ...(res && { statusCode: res.statusCode }),
-          ...(responseTime && { responseTime: `${responseTime}ms` }),
-          ...rest,
-        });
-      } catch (e) {
-        // If not JSON, just log the raw message
-        log.info(message.trim());
-      }
-    },
-  },
-};

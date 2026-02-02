@@ -1,7 +1,9 @@
 // Disable import first to allow dotenv configuration to happen before any imports
 /* eslint-disable import/first */
 import * as dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({
+  quiet: true,
+});
 
 import { knexController } from './database/database';
 import { redisClient } from './lib/auth/redis';
