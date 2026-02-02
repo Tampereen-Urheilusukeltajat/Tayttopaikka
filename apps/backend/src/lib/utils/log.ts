@@ -68,7 +68,6 @@ export const fastifyLogger = {
           ...(req && { method: req.method, url: req.url }),
           ...(res && { statusCode: res.statusCode }),
           ...(responseTime && { responseTime: `${responseTime}ms` }),
-          ...rest,
         });
       } catch (e) {
         // If not JSON, just log the raw message
