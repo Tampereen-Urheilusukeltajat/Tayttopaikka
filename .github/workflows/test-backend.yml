@@ -32,6 +32,7 @@ env:
   TRANSACTIONAL_FROM_EMAIL: no-reply@tayttopaikka.fi
   APPLICATION_URI: https://localhost:3000
   JWT_SECRET: dontuseme
+  FRONTEND_HOSTNAME: localhost
   TURNSTILE_SECRET: jaskajokunen
   SCW_ACCESS_KEY: empty
   SCW_SECRET_KEY: empty
