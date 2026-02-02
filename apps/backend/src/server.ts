@@ -8,7 +8,7 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyJwt from '@fastify/jwt';
 import fastifyAutoload from '@fastify/autoload';
-import { log, fastifyLogger } from './lib/utils/log';
+import { log } from './lib/utils/log';
 import path from 'path';
 import { errorHandler } from './lib/utils/errorHandler';
 import { type AuthPayload, type AuthUser } from './types/auth.types';
@@ -17,6 +17,7 @@ import fastifySwaggerUi from '@fastify/swagger-ui';
 import { getUserWithId } from './lib/queries/user';
 import { setKnexInstance } from './database/database';
 import { type Knex } from 'knex';
+import { fastifyLogger } from './lib/utils/fastifyLog';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (JWT_SECRET === undefined) {
