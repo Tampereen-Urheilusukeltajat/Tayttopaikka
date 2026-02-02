@@ -23,10 +23,7 @@ describe('CORS origin regex', () => {
       corsRegex.test('http://subdomain.tayttopaikka.fi'),
       true,
     );
-    assert.strictEqual(
-      corsRegex.test('https://a.b.c.tayttopaikka.fi'),
-      true,
-    );
+    assert.strictEqual(corsRegex.test('https://a.b.c.tayttopaikka.fi'), true);
   });
 
   it('blocks similar but invalid domains', () => {
