@@ -8,6 +8,7 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyJwt from '@fastify/jwt';
 import fastifyAutoload from '@fastify/autoload';
+import { makeCorsRegex } from './lib/utils/corsRegex';
 import { log } from './lib/utils/log';
 import path from 'path';
 import { errorHandler } from './lib/utils/errorHandler';
@@ -20,8 +21,13 @@ import { type Knex } from 'knex';
 import { fastifyLogger } from './lib/utils/fastifyLog';
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const FRONTEND_HOSTNAME = process.env.FRONTEND_HOSTNAME;
+
 if (JWT_SECRET === undefined) {
   throw new Error('Missing required env variable: JWT_SECRET');
+}
+if (FRONTEND_HOSTNAME === undefined) {
+  throw new Error('Missing required env variable: FRONTEND_HOSTNAME');
 }
 
 declare module '@fastify/jwt' {
@@ -108,10 +114,8 @@ export const buildServer = async (opts: {
     })
     .register(fastifyCors, {
       origin: (origin, cb) => {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const allowedOrigins = [frontendUrl];
-
-        if (!origin || allowedOrigins.includes(origin)) {
+        const urlPattern = makeCorsRegex(FRONTEND_HOSTNAME);
+        if (!origin || urlPattern.test(origin)) {
           cb(null, true);
         } else {
           cb(new Error('Not allowed by CORS'), false);
