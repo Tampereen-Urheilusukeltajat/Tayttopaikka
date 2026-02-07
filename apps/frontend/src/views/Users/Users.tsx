@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useUsersQuery } from '../../lib/queries/userQuery';
 
 import {
@@ -60,6 +60,7 @@ export const UsersPage: React.FC = () => {
   const userId = getUserIdFromAccessToken();
   const { data } = useUsersQuery();
   const { mutate: updateUserRoles } = useUserRolesMutation();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const onCheckboxChange = useCallback(
     (userId: string, column: keyof UserRoles, currentValue: boolean) => {
@@ -89,6 +90,25 @@ export const UsersPage: React.FC = () => {
       ) ?? [],
     [data],
   );
+
+  const filteredUserData = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return userData;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return userData.filter((user) => {
+      const fullName = `${user.surname} ${user.forename}`.toLowerCase();
+      const email = user.email.toLowerCase();
+      const phoneNumber = user.phoneNumber?.toLowerCase() ?? '';
+
+      return (
+        fullName.includes(query) ||
+        email.includes(query) ||
+        phoneNumber.includes(query)
+      );
+    });
+  }, [userData, searchQuery]);
 
   const userColumns = useMemo(
     () => [
@@ -205,7 +225,7 @@ export const UsersPage: React.FC = () => {
 
   const userTable = useReactTable({
     columns: userColumns,
-    data: userData,
+    data: filteredUserData,
     getCoreRowModel: getCoreRowModel(),
     state: {
       columnVisibility: {
@@ -227,6 +247,16 @@ export const UsersPage: React.FC = () => {
       </div>
       <div className="mt-4">
         <h2>Käyttäjälistaus</h2>
+        <div className="mb-3">
+          <input
+            type="text"
+            placeholder="Hae nimellä, sähköpostilla tai puhelinnumerolla..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="form-control"
+            style={{ maxWidth: '500px' }}
+          />
+        </div>
         <CommonTableV2 table={userTable} />
       </div>
     </>
