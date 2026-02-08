@@ -4,6 +4,7 @@ import {
   CleanupAction,
   type InactiveUser,
   type UserCleanupAudit,
+  type ArchivedUserInfo,
 } from '../../types/userCleanup.types';
 import { type DBResponse } from '../../types/general.types';
 import { getUnpaidFillEvents } from './payment';
@@ -93,6 +94,7 @@ export const logCleanupAction = async (
   reason: string,
   lastLoginDate: Date | null,
   trx?: Knex.Transaction,
+  performedByUserId?: string,
 ): Promise<void> => {
   const db = trx ?? knexController;
 
@@ -102,6 +104,7 @@ export const logCleanupAction = async (
     reason,
     last_login_date: lastLoginDate,
     executed_at: db.fn.now(),
+    performed_by_user_id: performedByUserId ?? null,
   });
 };
 
@@ -155,4 +158,90 @@ export const anonymizeUserForCleanup = async (
   await db('diving_cylinder_set')
     .where({ owner: userId })
     .update({ archived: true });
+};
+
+/**
+ * Get all archived users (not yet anonymized) with detailed information
+ * Includes unpaid invoices count for each user
+ */
+export const getArchivedUsersWithDetails = async (): Promise<
+  ArchivedUserInfo[]
+> => {
+  const query = `
+    SELECT
+      u.id,
+      u.email,
+      u.forename,
+      u.surname,
+      u.last_login AS lastLogin,
+      u.archived_at AS archivedAt,
+      TIMESTAMPDIFF(MONTH, u.last_login, NOW()) AS monthsInactive,
+      (
+        SELECT COUNT(*)
+        FROM fill_event fe
+        WHERE fe.user_id = u.id
+          AND NOT EXISTS (
+            SELECT 1
+            FROM fill_event_payment_event fepe
+            JOIN payment_event pe ON pe.id = fepe.payment_event_id
+            WHERE fepe.fill_event_id = fe.id
+              AND pe.status = 'COMPLETED'
+          )
+      ) AS unpaidInvoicesCount
+    FROM user u
+    WHERE
+      u.archived_at IS NOT NULL
+      AND u.deleted_at IS NULL
+    ORDER BY u.archived_at DESC
+  `;
+
+  const [users] =
+    await knexController.raw<DBResponse<ArchivedUserInfo[]>>(query);
+
+  return users;
+};
+
+/**
+ * Unarchive a user by clearing archived_at and restoring their cylinder sets
+ * @param userId - The ID of the user to unarchive
+ * @param performedByUserId - The ID of the admin user performing the unarchive
+ * @param trx - Optional transaction
+ */
+export const unarchiveUser = async (
+  userId: string,
+  performedByUserId: string,
+  trx?: Knex.Transaction,
+): Promise<void> => {
+  const db = trx ?? knexController;
+
+  // Verify user exists and is archived but not anonymized
+  const user = await db('user')
+    .where({
+      id: userId,
+      deleted_at: null,
+    })
+    .whereNotNull('archived_at')
+    .first();
+
+  if (!user) {
+    throw new Error('User not found, not archived, or already anonymized');
+  }
+
+  // Clear archived_at timestamp
+  await db('user').where({ id: userId }).update({ archived_at: null });
+
+  // Restore associated diving cylinder sets
+  await db('diving_cylinder_set')
+    .where({ owner: userId })
+    .update({ archived: false });
+
+  // Log the unarchive action
+  await logCleanupAction(
+    userId,
+    CleanupAction.UNARCHIVE,
+    `User manually unarchived by admin. Previous archive date: ${user.archived_at}`,
+    user.last_login,
+    trx,
+    performedByUserId,
+  );
 };
