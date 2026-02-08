@@ -6,6 +6,7 @@ export enum CleanupAction {
   WARN_47_MONTHS = 'warn_47_months',
   ANONYMIZE_48_MONTHS = 'anonymize_48_months',
   SKIPPED_UNPAID_INVOICE = 'skipped_unpaid_invoice',
+  UNARCHIVE = 'unarchive',
 }
 
 export const userCleanupAudit = Type.Object({
@@ -27,4 +28,15 @@ export type InactiveUser = {
   lastLogin: Date;
   archivedAt: Date | null;
   monthsInactive: number;
+};
+
+export type ArchivedUserInfo = {
+  id: string;
+  email: string | null;
+  forename: string | null;
+  surname: string | null;
+  lastLogin: Date;
+  archivedAt: Date;
+  monthsInactive: number;
+  unpaidInvoicesCount: number;
 };

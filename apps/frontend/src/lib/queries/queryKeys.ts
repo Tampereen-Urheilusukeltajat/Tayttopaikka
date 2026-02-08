@@ -1,6 +1,7 @@
 // User related query keys
 export const USER_QUERY_KEY = (userId: string): string[] => ['user', userId];
 export const USERS_QUERY_KEY = ['users'];
+export const ARCHIVED_USERS_QUERY_KEY = ['archivedUsers'];
 
 // Diving cylinder set related query keys
 export const DIVING_CYLINDER_SETS_QUERY_KEY = (userId: string): string[] => [

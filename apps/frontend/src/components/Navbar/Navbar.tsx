@@ -60,6 +60,12 @@ export const Navbar: React.FC = () => {
                   <CustomLink className={styles.dropdownLink} to="/admin/users">
                     Käyttäjät
                   </CustomLink>
+                  <CustomLink
+                    className={styles.dropdownLink}
+                    to="/admin/archived-users"
+                  >
+                    Arkistoidut käyttäjät
+                  </CustomLink>
                   {/* <CustomLink
                     className={styles.dropdownLink}
                     to="/admin/filling-history"

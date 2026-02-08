@@ -23,6 +23,7 @@ import { PrivateContent } from './components/common/PrivateContent';
 import { Footer } from './components/Footer/Footer';
 import { InvoicePage } from './views/Invoice/Invoice';
 import { UsersPage } from './views/Users/Users';
+import { ArchivedUsersPage } from './views/ArchivedUsers/ArchivedUsers';
 
 const QUERY_CLIENT = new QueryClient();
 
@@ -76,6 +77,7 @@ const Content: React.FC = () => {
           <Route path="admin" element={<PrivateContent adminOnly />}>
             <Route path="invoice" element={<InvoicePage />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="archived-users" element={<ArchivedUsersPage />} />
           </Route>
 
           {/* 404 */}
