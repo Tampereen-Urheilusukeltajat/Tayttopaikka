@@ -10,6 +10,7 @@ import { redisClient } from './lib/auth/redis';
 
 import { log } from './lib/utils/log';
 import { buildServer } from './server';
+import { initializeScheduler } from './lib/utils/scheduler';
 
 const APPLICATION_HOST = process.env.APPLICATION_HOST;
 const APPLICATION_PORT = Number(process.env.APPLICATION_PORT);
@@ -50,6 +51,14 @@ void (async () => {
   } catch (error) {
     log.error('Error starting server!', error);
     process.exit(1);
+  }
+
+  log.info('Initializing scheduled jobs');
+  try {
+    initializeScheduler();
+  } catch (error) {
+    log.error('Error initializing scheduler!', error);
+    // Don't exit - server can still run without scheduler
   }
 
   log.info('Tayttopaikka backend started successfully');
