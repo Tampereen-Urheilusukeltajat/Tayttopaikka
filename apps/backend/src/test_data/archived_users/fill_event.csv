@@ -1,0 +1,3 @@
+id;user_id;cylinder_set_id;compressor_id;description;gas_mixture;created_at;updated_at;
+1;aaa5abcd-53d4-11ed-9342-0242ac120002;aaa1abcd-53d4-11ed-9342-0242ac120002;1;Test fill for archived user;EAN32;2022-01-19 03:14:07;2022-01-19 03:14:07;
+2;bbb5abcd-53d4-11ed-9342-0242ac120002;bbb1abcd-53d4-11ed-9342-0242ac120002;1;Another fill;Air;2023-01-19 03:14:07;2023-01-19 03:14:07;
