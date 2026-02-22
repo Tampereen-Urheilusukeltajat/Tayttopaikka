@@ -37,7 +37,10 @@ export const LogbookFillingTile: React.FC<AirLogbookFillingTileProps> = ({
       </div>
       <span className="text-danger">{errors.divingCylinderSetIds}</span>
 
-      <div className="d-flex flex-column flex-md-row gap-3" style={{ width: '100%' }}>
+      <div
+        className="d-flex flex-column flex-md-row gap-3"
+        style={{ width: '100%' }}
+      >
         <div
           className={`d-flex flex-column ${styles.fillingTile}`}
           style={{ flex: 1 }}

@@ -73,14 +73,16 @@ describe('get club cylinder sets', () => {
   });
 
   describe('Authorization', () => {
-    test('Regular user cannot get club cylinder sets (403)', async () => {
+    test('Regular user can get club cylinder sets (200)', async () => {
       const res = await server.inject({
         url: '/api/club-cylinder',
         method: 'GET',
         headers: userHeaders,
       });
 
-      assert.strictEqual(res.statusCode, 403);
+      assert.strictEqual(res.statusCode, 200);
+      const result = JSON.parse(res.body);
+      assert.ok(Array.isArray(result));
     });
 
     test('Unauthenticated user cannot get club cylinder sets (401)', async () => {
