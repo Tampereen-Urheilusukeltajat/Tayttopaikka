@@ -4,7 +4,7 @@ Node.js server application which serves the Täyttopaikka UI.
 
 ## Tech
 
-This project uses Node.js and Fastify. MariaDB is used as the database and Redis stores refresh tokens. For email related things, Sendgrid is used.
+This project uses Node.js and Fastify. MariaDB is used as the database and Redis stores refresh tokens. For email related things, Scaleway is used.
 
 ## Local development with Linux (Ubuntu based distros)
 

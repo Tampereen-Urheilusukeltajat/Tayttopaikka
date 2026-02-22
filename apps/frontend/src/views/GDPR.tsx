@@ -7,7 +7,7 @@ export const GDPR: React.FC = () => {
       <h2>
         Tämä on Tampereen Urheilusukeltajat ry:n (Taursu) EU:n yleisen
         tietosuoja-asetuksen (GDPR) mukainen rekisteri- ja tietosuojaseloste.
-        Laadittu 30.11.2022. Viimeisin muutos 18.04.2023.
+        Laadittu 30.11.2022. Viimeisin muutos 15.02.2026.
       </h2>
       <ul style={{ listStyle: 'none', padding: '0' }}>
         <li style={{ margin: '12px 0' }}>
@@ -99,6 +99,22 @@ export const GDPR: React.FC = () => {
             tai viranomaisten niitä pyytäessä. Tietoja ei julkaista. Tietoja ei
             siirretä EU:n tai ETA:n ulkopuolelle.
           </p>
+          <p>Palvelu käyttää seuraavia tietojenkäsittelijöitä:</p>
+          <ul>
+            <li>
+              <strong>Fly.io</strong> - Palvelun hosting ja tietojen säilytys.
+              Rekisterinpitäjä on solminut Fly.io:n kanssa
+              tietojenkäsittelysopimuksen, joka täyttää GDPR:n vaatimukset.
+              Palvelu sijaitsee Amsterdamissa (Alankomaat) ja kaikki tiedot
+              säilytetään palvelimilla Amsterdamissa. Tietokannan varmuuskopiot
+              säilytetään Suomessa.
+            </li>
+            <li>
+              <strong>Scaleway</strong> - Sähköpostipalvelu. Scaleway on
+              eurooppalainen palveluntarjoaja. Sähköpostit lähetetään heidän
+              palvelinkeskuksestaan Ranskassa.
+            </li>
+          </ul>
         </li>
         <li style={{ padding: '12px 0' }}>
           <h3>Rekisterin suojauksen periaatteet</h3>
@@ -133,17 +149,49 @@ export const GDPR: React.FC = () => {
           <h3>Muut henkilötietojen käsittelyyn liittyvät oikeudet</h3>
           <p>
             Rekisterissä olevalla henkilöllä on oikeus pyytää häntä koskevien
-            henkilötietojen poistamiseen rekisteristä ("oikeus tulla
+            henkilötietojen poistamiseen rekisteristä ("oikeus tullaContinuous
             unohdetuksi"). Niin ikään rekisteröidyillä on muut{' '}
             <a href="http://eur-lex.europa.eu/legal-content/FI/TXT/?uri=CELEX%3A32016R0679#d1e2144-1-1">
               EU:n yleisen tietosuoja-asetuksen
             </a>{' '}
-            kuten henkilötietojen käsittelyn rajoittaminen tietyissä
-            tilanteissa. Pyynnöt tulee lähettää sähköisesti rekisterinpitäjälle.
+            mukaiset oikeudet, kuten henkilötietojen käsittelyn rajoittaminen
+            tietyissä tilanteissa ja oikeus siirtää tiedot järjestelmästä
+            toiseen. Pyynnöt tulee lähettää sähköisesti rekisterinpitäjälle.
             Rekisterinpitäjä voi pyytää tarvittaessa pyynnön esittäjää
             todistamaan henkilöllisyytensä. Rekisterinpitäjä vastaa asiakkaalle
             EU:n tietosuoja-asetuksessa säädetyssä ajassa, pääsääntöisesti
             kuukauden kuluessa.
+          </p>
+        </li>
+        <li style={{ padding: '12px 0' }}>
+          <h3>Oikeus tehdä valitus valvontaviranomaiselle</h3>
+          <p>
+            Rekisterissä olevalla henkilöllä on oikeus tehdä valitus
+            toimivaltaiselle valvontaviranomaiselle, jos henkilö katsoo, että
+            häntä koskevien henkilötietojen käsittelyssä rikotaan EU:n yleistä
+            tietosuoja-asetusta.
+          </p>
+          <p>
+            Suomen toimivaltainen valvontaviranomainen on:
+            <br />
+            <strong>Tietosuojavaltuutetun toimisto</strong>
+            <br />
+            Käyntiosoite: Lintulahdenkuja 4, 00530 Helsinki
+            <br />
+            Postiosoite: PL 800, 00531 Helsinki
+            <br />
+            Puhelinvaihde: 029 566 6700
+            <br />
+            Sähköposti: <a href="mailto:tietosuoja@om.fi">tietosuoja@om.fi</a>
+            <br />
+            Verkkosivut:{' '}
+            <a
+              href="https://tietosuoja.fi"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              https://tietosuoja.fi
+            </a>
           </p>
         </li>
       </ul>
