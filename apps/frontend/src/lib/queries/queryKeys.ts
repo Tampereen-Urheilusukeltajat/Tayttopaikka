@@ -8,6 +8,7 @@ export const DIVING_CYLINDER_SETS_QUERY_KEY = (userId: string): string[] => [
   'divingCylinderSets',
   userId,
 ];
+export const CLUB_CYLINDER_SETS_QUERY_KEY = ['clubCylinderSets'];
 
 // Storage cylinder query keys
 export const STORAGE_CYLINDERS_QUERY_KEY = ['storageCylinder'];

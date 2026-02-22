@@ -3,11 +3,13 @@ import { NewBlenderFillingEvent } from '../components/BlenderLogbook/BlenderLogb
 import { useCompressorQuery } from '../lib/queries/compressorQuery';
 import { useGasesQuery } from '../lib/queries/gasQuery';
 import { useStorageCylinderQuery } from '../lib/queries/storageCylinderQuery';
-import { getUserIdFromAccessToken } from '../lib/utils';
+import { getUserIdFromAccessToken, getUserRoles } from '../lib/utils';
 import { useDivingCylinderQuery } from '../lib/queries/divingCylinderQuery';
+import { useClubCylinderQuery } from '../lib/queries/clubCylinderQuery';
 
 export const BlenderLogbook = (): JSX.Element => {
   const userId = useMemo(() => getUserIdFromAccessToken(), []);
+  const { isInstructor, isAdmin } = getUserRoles();
 
   const { data: allCompressors, isError: isCompressorError } =
     useCompressorQuery();
@@ -16,6 +18,7 @@ export const BlenderLogbook = (): JSX.Element => {
   const { data: gases, isError: isGasesError } = useGasesQuery();
   const { data: divingCylinderSets, isError: isDivingCylindersError } =
     useDivingCylinderQuery(userId);
+  const { data: clubCylinderSets } = useClubCylinderQuery();
 
   const compressors = useMemo(
     () => allCompressors?.filter((c) => !c.airOnly) ?? [],
@@ -67,6 +70,9 @@ export const BlenderLogbook = (): JSX.Element => {
         <NewBlenderFillingEvent
           compressors={compressors ?? []}
           divingCylinderSets={divingCylinderSets ?? []}
+          clubCylinderSets={
+            isInstructor || isAdmin ? (clubCylinderSets ?? []) : []
+          }
           gases={gases ?? []}
           storageCylinders={storageCylinders ?? []}
         />

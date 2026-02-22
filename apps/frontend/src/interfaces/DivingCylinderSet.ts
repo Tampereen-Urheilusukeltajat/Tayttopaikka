@@ -12,4 +12,5 @@ export type DivingCylinderSet = {
   owner: string;
   name: string;
   cylinders: DivingCylinder[];
+  isClubCylinder: boolean;
 };

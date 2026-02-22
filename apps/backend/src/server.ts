@@ -150,6 +150,17 @@ export const buildServer = async (opts: {
         return errorHandler(reply, 403, 'User is not an admin');
       }
     })
+    .decorate(
+      'instructor',
+      async (request: FastifyRequest, reply: FastifyReply) => {
+        const user = await getUserWithId(request.user.id, true);
+
+        if (user === undefined) return errorHandler(reply, 500);
+        if (!user.isInstructor && !user.isAdmin) {
+          return errorHandler(reply, 403, 'User is not an instructor');
+        }
+      },
+    )
     .register(fastifyAutoload, {
       dir: path.join(__dirname, 'routes'),
       dirNameRoutePrefix: (_folderParent, folderName) =>

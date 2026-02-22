@@ -80,14 +80,14 @@ describe('create cylinder set', () => {
     const responseBody = JSON.parse(res.body);
 
     // Extract only the fields we want to compare
-    const { id, cylinders, ...restOfResponse } = responseBody;
+    const { id, cylinders, isClubCylinder, ...restOfResponse } = responseBody;
     const { id: cylinderId, inspection, ...restOfCylinder } = cylinders[0];
 
     // Check inspection field exists and contains the expected date
     assert.ok(inspection);
     assert.ok(inspection.includes(payload.cylinders[0].inspection));
 
-    // Compare without ids and inspection
+    // Compare without ids, inspection, and isClubCylinder
     const normalizedResponse = {
       ...restOfResponse,
       cylinders: [restOfCylinder, ...cylinders.slice(1)],

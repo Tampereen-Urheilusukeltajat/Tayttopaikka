@@ -11,12 +11,14 @@ export const PrivateContent: React.FC<PrivateContentProps> = ({
   adminOnly,
   blenderOnly,
   userOnly,
+  instructorOnly,
 }) => {
   return (
     <ProtectedRoute
       adminOnly={adminOnly}
       blenderOnly={blenderOnly}
       userOnly={userOnly}
+      instructorOnly={instructorOnly}
     >
       <Navbar />
       <Container className="justify-self-start pt-4">

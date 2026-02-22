@@ -10,12 +10,14 @@ import { type Compressor } from '../../../lib/queries/compressorQuery';
 
 type BasicInfoTileProps = CommonTileProps & {
   divingCylinderSets: DivingCylinderSet[];
+  clubCylinderSets?: DivingCylinderSet[];
   compressors: Compressor[];
 };
 
 export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
   compressors,
   divingCylinderSets,
+  clubCylinderSets = [],
   errors,
   values,
 }) => (
@@ -37,11 +39,24 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
                 {dcs.name}
                 {divingCylinderSets.filter((e) => e.name === dcs.name).length >
                 1
-                  ? ` (${dcs.cylinders[0].serialNumber})`
+                  ? ` (${dcs.cylinders[0]?.serialNumber ?? 'N/A'})`
                   : ''}
               </option>
             ))}
           </optgroup>
+          {clubCylinderSets.length > 0 && (
+            <optgroup label="Seuran pullot">
+              {clubCylinderSets.map((dcs) => (
+                <option key={dcs.id} value={dcs.id}>
+                  {dcs.name}
+                  {clubCylinderSets.filter((e) => e.name === dcs.name).length >
+                  1
+                    ? ` (${dcs.cylinders[0]?.serialNumber ?? 'N/A'})`
+                    : ''}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </DropdownMenu>
         <DropdownMenu
           name="compressorId"
