@@ -27,6 +27,7 @@ import { toast } from 'react-toastify';
 type NewFillingEventProps = {
   compressors: Compressor[];
   divingCylinderSets: DivingCylinderSet[];
+  clubCylinderSets?: DivingCylinderSet[];
   gases: GasWithPricing[];
   storageCylinders: StorageCylinder[];
 };
@@ -85,6 +86,7 @@ export type CommonTileProps = {
 export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
   compressors,
   divingCylinderSets,
+  clubCylinderSets = [],
   gases,
   storageCylinders,
 }) => {
@@ -172,6 +174,7 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
               <BasicInfoTile
                 compressors={compressors}
                 divingCylinderSets={divingCylinderSets}
+                clubCylinderSets={clubCylinderSets}
                 errors={errors}
                 values={values}
               />

@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { PageLoadingSpinner } from './components/Spinner';
 import { DivingCylinders } from './views/DivingCylinders/DivingCylinders';
+import { ClubCylinders } from './views/ClubCylinders/ClubCylinders';
 import { UserSettings } from './components/UserSettings/UserSettings';
 import { BlenderLogbook } from './views/BlenderLogbook';
 import { Logbook } from './views/Logbook';
@@ -71,6 +72,11 @@ const Content: React.FC = () => {
           {/* Blender only views */}
           <Route element={<PrivateContent blenderOnly userOnly />}>
             <Route path="blender-logbook" element={<BlenderLogbook />} />
+          </Route>
+
+          {/* Instructor only views */}
+          <Route element={<PrivateContent instructorOnly />}>
+            <Route path="club-cylinders" element={<ClubCylinders />} />
           </Route>
 
           {/* Admin only views */}

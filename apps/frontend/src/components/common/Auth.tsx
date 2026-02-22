@@ -11,6 +11,7 @@ export type PrivateRouteProps = {
   userOnly?: boolean;
   blenderOnly?: boolean;
   adminOnly?: boolean;
+  instructorOnly?: boolean;
 };
 
 export const ProtectedRoute: React.FC<PrivateRouteProps> = ({
@@ -18,6 +19,7 @@ export const ProtectedRoute: React.FC<PrivateRouteProps> = ({
   userOnly = false,
   blenderOnly = false,
   adminOnly = false,
+  instructorOnly = false,
 }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ export const ProtectedRoute: React.FC<PrivateRouteProps> = ({
 
     validateAuth()
       .then(() => {
-        const { isAdmin, isBlender, isUser, isAdvancedBlender } =
+        const { isAdmin, isBlender, isUser, isAdvancedBlender, isInstructor } =
           getUserRoles();
 
         if (userOnly && !(isUser || isAdmin)) {
@@ -47,7 +49,8 @@ export const ProtectedRoute: React.FC<PrivateRouteProps> = ({
 
         if (
           (blenderOnly && !(isBlender || isAdvancedBlender || isAdmin)) ||
-          (adminOnly && !isAdmin)
+          (adminOnly && !isAdmin) ||
+          (instructorOnly && !(isInstructor || isAdmin))
         ) {
           toast.error('Ei oikeutta näkymään');
           navigate('/logbook');
@@ -56,7 +59,7 @@ export const ProtectedRoute: React.FC<PrivateRouteProps> = ({
       .catch(() => {
         navigate('/login');
       });
-  }, [navigate, blenderOnly, adminOnly, userOnly]);
+  }, [navigate, blenderOnly, adminOnly, userOnly, instructorOnly]);
 
   useEffect(() => {
     if (!loading && !authenticated) {

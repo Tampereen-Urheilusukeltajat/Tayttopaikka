@@ -36,11 +36,19 @@ export const createDivingCylinderSet = Type.Object({
 
 export type CreateDivingCylinderSet = Static<typeof createDivingCylinderSet>;
 
+export const createClubCylinderSet = Type.Object({
+  name: Type.String({ minLength: 1, maxLength: 255 }),
+  cylinders: Type.Array(createDivingCylinderBody, { minItems: 1 }),
+});
+
+export type CreateClubCylinderSet = Static<typeof createClubCylinderSet>;
+
 export const divingCylinderSet = Type.Object({
   id: Type.String({ format: 'uuid' }),
   owner: Type.String({ format: 'uuid' }),
   name: Type.String(),
   cylinders: Type.Array(divingCylinder),
+  isClubCylinder: Type.Boolean(),
 });
 
 export type DivingCylinderSet = Static<typeof divingCylinderSet>;

@@ -2,6 +2,7 @@ import { useMemo, type JSX } from 'react';
 import { NewFillingEvent } from '../components/Logbook/Logbook';
 import { useCompressorQuery } from '../lib/queries/compressorQuery';
 import { useDivingCylinderQuery } from '../lib/queries/divingCylinderQuery';
+import { useClubCylinderQuery } from '../lib/queries/clubCylinderQuery';
 import { getUserIdFromAccessToken } from '../lib/utils';
 
 export const Logbook = (): JSX.Element => {
@@ -14,6 +15,7 @@ export const Logbook = (): JSX.Element => {
   );
   const { data: divingCylinderSets, isError: isDivingCylindersError } =
     useDivingCylinderQuery(userId);
+  const { data: clubCylinderSets } = useClubCylinderQuery();
 
   const anyErrors = isDivingCylindersError || isError;
   const requiredDataLoaded =
@@ -37,6 +39,7 @@ export const Logbook = (): JSX.Element => {
         <NewFillingEvent
           compressors={compressors}
           divingCylinderSets={divingCylinderSets ?? []}
+          clubCylinderSets={clubCylinderSets ?? []}
         />
       )}
     </>

@@ -9,6 +9,19 @@ import {
 import { type DBResponse } from '../../types/general.types';
 import { log } from '../utils/log';
 
+type CylinderSetWithCylinderRow = {
+  id: string;
+  owner: string;
+  name: string;
+  isClubCylinder: boolean;
+  cylinderId: string;
+  volume: number;
+  pressure: number;
+  material: string;
+  serialNumber: string;
+  inspection: string;
+};
+
 export const divingCylinderSetExists = async (
   divingCylinderSetId: string,
   userId: string,
@@ -36,6 +49,29 @@ export const divingCylinderSetExists = async (
   return false;
 };
 
+export const clubCylinderSetExists = async (
+  divingCylinderSetId: string,
+  trx?: Knex.Transaction,
+): Promise<boolean> => {
+  const db = trx ?? knexController;
+
+  const [exists] = await db.raw<DBResponse<number[]>>(
+    `
+    SELECT
+      1
+    FROM diving_cylinder_set
+    WHERE
+      id = :divingCylinderSetId AND
+      is_club_cylinder = 1
+  `,
+    {
+      divingCylinderSetId,
+    },
+  );
+
+  return exists.length > 0;
+};
+
 export const archiveDivingCylinderSet = async (
   divingCylinderSetId: string,
   trx?: Knex.Transaction,
@@ -61,51 +97,111 @@ export const getUsersDivingCylinderSets = async (
 ): Promise<DivingCylinderSet[]> => {
   const db = trx ?? knexController;
 
-  const [divingCylinderSets] = await db.raw<
-    DBResponse<DivingCylinderSetBasicInfo[]>
-  >(
+  const [results] = await db.raw<DBResponse<CylinderSetWithCylinderRow[]>>(
     `
     SELECT
-      id,
-      owner,
-      name
-    FROM diving_cylinder_set
-    WHERE
-      owner = :userId AND
-      archived = 0
-  `,
-    {
-      userId,
-    },
-  );
-
-  if (divingCylinderSets.length === 0) return [];
-
-  const [divingCylinders] = await db.raw<DBResponse<DivingCylinderWithSetId[]>>(
-    `
-    SELECT
-      dc.id,
+      dcs.id,
+      dcs.owner,
+      dcs.name,
+      dcs.is_club_cylinder AS isClubCylinder,
+      dc.id AS cylinderId,
       dc.volume,
       dc.pressure,
       dc.material,
       dc.serial_number AS serialNumber,
-      dc.inspection,
-      dcts.cylinder_set AS cylinderSetId
-    FROM diving_cylinder_to_set dcts
-    JOIN diving_cylinder dc ON 
-      dcts.cylinder = dc.id
+      dc.inspection
+    FROM diving_cylinder_set dcs
+    INNER JOIN diving_cylinder_to_set dcts ON dcs.id = dcts.cylinder_set
+    INNER JOIN diving_cylinder dc ON dcts.cylinder = dc.id
     WHERE
-      dcts.cylinder_set IN (${divingCylinderSets.map(() => '?').join(',')})
+      dcs.owner = :userId AND
+      dcs.archived = 0 AND
+      dcs.is_club_cylinder = 0
   `,
-    [...divingCylinderSets.map((dcs) => dcs.id)],
+    { userId },
   );
 
-  return divingCylinderSets.map((dcts) => ({
-    ...dcts,
-    cylinders: [
-      ...divingCylinders.filter((dc) => dc.cylinderSetId === dcts.id),
-    ],
-  }));
+  if (results.length === 0) return [];
+
+  const cylinderSetsMap = new Map<string, DivingCylinderSet>();
+
+  for (const row of results) {
+    if (!cylinderSetsMap.has(row.id)) {
+      cylinderSetsMap.set(row.id, {
+        id: row.id,
+        owner: row.owner,
+        name: row.name,
+        isClubCylinder: row.isClubCylinder,
+        cylinders: [],
+      });
+    }
+
+    cylinderSetsMap.get(row.id)!.cylinders.push({
+      id: row.cylinderId,
+      volume: row.volume,
+      pressure: row.pressure,
+      material: row.material,
+      serialNumber: row.serialNumber,
+      inspection: row.inspection,
+    });
+  }
+
+  return Array.from(cylinderSetsMap.values());
+};
+
+export const getClubCylinderSets = async (
+  trx?: Knex.Transaction,
+): Promise<DivingCylinderSet[]> => {
+  const db = trx ?? knexController;
+
+  const [results] = await db.raw<DBResponse<CylinderSetWithCylinderRow[]>>(
+    `
+    SELECT
+      dcs.id,
+      dcs.owner,
+      dcs.name,
+      dcs.is_club_cylinder AS isClubCylinder,
+      dc.id AS cylinderId,
+      dc.volume,
+      dc.pressure,
+      dc.material,
+      dc.serial_number AS serialNumber,
+      dc.inspection
+    FROM diving_cylinder_set dcs
+    INNER JOIN diving_cylinder_to_set dcts ON dcs.id = dcts.cylinder_set
+    INNER JOIN diving_cylinder dc ON dcts.cylinder = dc.id
+    WHERE
+      dcs.is_club_cylinder = 1 AND
+      dcs.archived = 0
+  `,
+  );
+
+  if (results.length === 0) return [];
+
+  const cylinderSetsMap = new Map<string, DivingCylinderSet>();
+
+  for (const row of results) {
+    if (!cylinderSetsMap.has(row.id)) {
+      cylinderSetsMap.set(row.id, {
+        id: row.id,
+        owner: row.owner,
+        name: row.name,
+        isClubCylinder: row.isClubCylinder,
+        cylinders: [],
+      });
+    }
+
+    cylinderSetsMap.get(row.id)!.cylinders.push({
+      id: row.cylinderId,
+      volume: row.volume,
+      pressure: row.pressure,
+      material: row.material,
+      serialNumber: row.serialNumber,
+      inspection: row.inspection,
+    });
+  }
+
+  return Array.from(cylinderSetsMap.values());
 };
 
 /**
@@ -142,7 +238,12 @@ export const selectCylinderSet = async (
   id: string,
 ): Promise<DivingCylinderSet | undefined> => {
   const set: DivingCylinderSet | undefined = await trx('diving_cylinder_set')
-    .select<DivingCylinderSet>('id', 'owner', 'name')
+    .select<DivingCylinderSet>(
+      'id',
+      'owner',
+      'name',
+      'is_club_cylinder as isClubCylinder',
+    )
     .where('id', id)
     .first();
 

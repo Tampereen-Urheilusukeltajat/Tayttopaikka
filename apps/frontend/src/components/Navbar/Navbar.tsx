@@ -23,7 +23,8 @@ export const Navbar: React.FC = () => {
     navigate('/login');
   }, [navigate, queryClient]);
 
-  const { isAdmin, isBlender, isAdvancedBlender, isUser } = getUserRoles();
+  const { isAdmin, isBlender, isAdvancedBlender, isUser, isInstructor } =
+    getUserRoles();
   const fullName = getUserFullName();
 
   return (
@@ -46,6 +47,10 @@ export const Navbar: React.FC = () => {
                 )}
 
               <CustomLink to="/diving-cylinder-set">Omat pullot</CustomLink>
+
+              {(isInstructor || isAdmin) && (
+                <CustomLink to="/club-cylinders">Seuran pullot</CustomLink>
+              )}
 
               <CustomLink to="/fill-events">Täyttöhistoria</CustomLink>
 
