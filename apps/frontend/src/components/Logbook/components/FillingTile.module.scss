@@ -4,11 +4,53 @@
   background: $white-smoke-light;
   border-radius: 12px;
   border: 1px solid $timberwolf;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 1rem;
   margin-bottom: 1rem;
-  padding: 0.5rem;
+  padding: 1rem;
   position: relative;
+}
+
+.cylinderCheckbox {
+  background: white;
+  border-radius: 8px;
+  padding: 0.75rem 0.75rem 0.75rem 0.5rem;
+  border: 1px solid $timberwolf;
+  transition: all 0.15s ease-in-out;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    background: lighten($white-smoke-light, 2%);
+    border-color: darken($timberwolf, 10%);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  label {
+    cursor: pointer;
+    margin-bottom: 0;
+    flex: 1;
+    padding-left: 0.75rem;
+  }
+
+  input[type='checkbox'] {
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    margin-top: 0;
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+}
+
+.clubCylinderSwitch {
+  :global(.form-check-input) {
+    width: 3rem;
+    height: 1.5rem;
+    cursor: pointer;
+  }
+
+  :global(.form-check-label) {
+    cursor: pointer;
+    padding-left: 0.5rem;
+  }
 }

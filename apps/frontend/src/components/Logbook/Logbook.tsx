@@ -28,6 +28,7 @@ const EMPTY_FILLING_EVENT_BASIC_INFO: FillingEventBasicInfo = {
 type NewFillingEventProps = {
   compressors: Compressor[];
   divingCylinderSets: DivingCylinderSet[];
+  clubCylinderSets: DivingCylinderSet[];
 };
 
 type FormFields = FillingEventBasicInfo & { divingCylinderSetIds: string[] };
@@ -35,6 +36,7 @@ type FormFields = FillingEventBasicInfo & { divingCylinderSetIds: string[] };
 export const NewFillingEvent: React.FC<NewFillingEventProps> = ({
   compressors,
   divingCylinderSets,
+  clubCylinderSets,
 }) => {
   const fillEventMutation = useMutation({
     mutationFn: async (payload: NewFillEvent) => postFillEvent(payload),
@@ -95,6 +97,7 @@ export const NewFillingEvent: React.FC<NewFillingEventProps> = ({
               errors={errors}
               values={values}
               divingCylinderSets={divingCylinderSets}
+              clubCylinderSets={clubCylinderSets}
             />
             <AirLogbookSavingTile errors={errors} values={values} />
           </Form>
