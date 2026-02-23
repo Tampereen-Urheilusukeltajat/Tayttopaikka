@@ -33,7 +33,7 @@ export const AdminDropdown: React.FC<AdminDropdownButtonProps> = ({
   const isActive = !!useMatch({ path: resolvedPath.pathname });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseEnter = useCallback(() => {
     if (closeTimeoutRef.current) {
