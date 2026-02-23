@@ -164,12 +164,14 @@ nav {
   border: 1px solid $aluminium;
   border-radius: 0 0 8px 8px;
   position: absolute;
-  top: 64px;
+  top: 100%;
   left: 0;
   z-index: 9999;
   min-width: 220px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  animation: slideDown 0.2s ease-out;
+  margin-top: 0;
+  padding: 0;
+  list-style: none;
 
   li {
     color: $black;
