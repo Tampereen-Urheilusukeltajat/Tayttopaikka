@@ -27,29 +27,45 @@ export const AdminDropdown: React.FC<AdminDropdownButtonProps> = ({
   const resolvedPath = useResolvedPath('/admin/*');
 
   const [isOpen, setIsOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth <= 991 : false
+  );
   const isActive = !!useMatch({ path: resolvedPath.pathname });
 
-  const onDropdownButtonClick = useCallback(() => {
-    setIsOpen(!isOpen);
-  }, [isOpen]);
-
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    if (window.innerWidth > 991) {
+      setIsOpen(true);
+    }
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
-    if (!isMobile) {
-      setIsOpen(false);
+    if (window.innerWidth > 991) {
+      closeTimeoutRef.current = setTimeout(() => {
+        setIsOpen(false);
+      }, 150);
     }
-  }, [isMobile]);
+  }, []);
+
+  const handleClick = useCallback(() => {
+    if (window.innerWidth <= 991) {
+      setIsOpen((prev) => !prev);
+    }
+  }, []);
 
   // Close dropdown when mobile menu closes
   useEffect(() => {
-    if (!isMobileMenuOpen && isOpen) {
-      // Use setTimeout to defer state update to next tick
+    if (!isMobileMenuOpen && isOpen && isMobile) {
       const timer = setTimeout(() => setIsOpen(false), 0);
       return () => clearTimeout(timer);
     }
-  }, [isMobileMenuOpen, isOpen]);
+  }, [isMobileMenuOpen, isOpen, isMobile]);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -60,7 +76,12 @@ export const AdminDropdown: React.FC<AdminDropdownButtonProps> = ({
     checkMobile();
     window.addEventListener('resize', checkMobile);
 
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -70,6 +91,7 @@ export const AdminDropdown: React.FC<AdminDropdownButtonProps> = ({
       <div
         className={styles.adminDropdownWrapper}
         ref={dropdownRef}
+        onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         <button
@@ -81,7 +103,7 @@ export const AdminDropdown: React.FC<AdminDropdownButtonProps> = ({
           `}
           disabled={disabled}
           key={key}
-          onClick={onDropdownButtonClick}
+          onClick={handleClick}
           type={ButtonType.button}
           aria-expanded={isOpen}
         >
@@ -92,7 +114,7 @@ export const AdminDropdown: React.FC<AdminDropdownButtonProps> = ({
           />
         </button>
 
-        {isOpen && <div className={styles.dropdownMenu}>{children}</div>}
+        {isOpen && <ul className={styles.dropdownMenu}>{children}</ul>}
       </div>
     </li>
   );
