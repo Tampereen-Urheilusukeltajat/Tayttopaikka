@@ -1,5 +1,20 @@
 @use '../../variables.scss' as *;
 
+.navbar {
+  background-color: $blue;
+  padding: 0 !important;
+  transition: all 0.3s ease;
+  max-width: 100vw;
+
+  :global(.container) {
+    max-width: 100%;
+  }
+}
+
+.navbarCollapse {
+  transition: all 0.3s ease-in-out;
+}
+
 nav {
   background-color: $blue;
   padding: 0 !important;
@@ -8,6 +23,7 @@ nav {
     align-items: center;
     color: $white;
     display: flex;
+    transition: background-color 0.2s ease;
   }
 
   ul {
@@ -15,6 +31,7 @@ nav {
     list-style: none;
     justify-content: space-between;
     width: 100%;
+    overflow: visible;
   }
 
   p {
@@ -35,6 +52,7 @@ nav {
     justify-content: center;
     padding: 0.625rem 1rem;
     text-decoration: none;
+    transition: all 0.2s ease;
   }
 
   li:hover:not(.active) {
@@ -78,26 +96,52 @@ nav {
   align-self: center;
 }
 
+.adminDropdownItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+
+  &.mobile {
+    width: 100%;
+    display: block;
+  }
+}
+
+.adminDropdownWrapper {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+}
+
 .dropdownButton {
   align-items: center;
   background-color: $blue;
   border-radius: 0;
   border: none;
   color: $white;
-  display: flex;
-  position: relative;
+  display: inline-flex;
   flex-direction: row;
   font-weight: 500;
   font-family: roboto;
   justify-content: center;
-  padding: 0.5rem 1rem;
-  height: 100%;
+  padding: 0.625rem 1rem;
+  height: 64px;
+  gap: 0.5rem;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+  cursor: pointer;
 
   &:disabled {
     background-color: $grey;
+    cursor: not-allowed;
   }
 
-  &:hover:not(.active) {
+  &:hover:not(.active):not(:disabled) {
     background-color: $blue-hover;
     color: $white;
   }
@@ -107,17 +151,29 @@ nav {
   }
 }
 
+.chevron {
+  transition: transform 0.2s ease;
+
+  &.rotated {
+    transform: rotate(180deg);
+  }
+}
+
 .dropdownMenu {
-  background: $white-smoke;
-  border: 1px solid $grey;
-  border-top: none;
+  background-color: $white;
+  border: 1px solid $aluminium;
   border-radius: 0 0 8px 8px;
-  color: $grey;
   position: absolute;
+  top: 64px;
+  left: 0;
   z-index: 9999;
+  min-width: 220px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.2s ease-out;
 
   li {
     color: $black;
+    margin: 0;
   }
 
   li:last-child {
@@ -134,26 +190,156 @@ nav {
   }
 }
 
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .dropdownLink {
   &.active {
     background-color: $timberwolf !important;
   }
 }
 
-@media (max-width: 780px) {
+@media (max-width: 991px) {
+  .navbar {
+    overflow-x: hidden;
+
+    :global(.container) {
+      overflow-x: hidden;
+    }
+  }
+
+  .navbarCollapse {
+    background-color: $blue;
+    margin: 0 -1rem;
+    padding: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
+
+    // Smooth slide-in animation
+    &.collapsing {
+      transition: height 0.35s ease;
+    }
+
+    // Ensure nav items don't overflow
+    :global(.navbar-nav) {
+      max-width: 100%;
+      overflow-x: hidden;
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
   nav {
     a {
       justify-content: left;
-      padding: 0 1rem;
+      padding: 0.875rem 1.5rem;
       width: 100%;
+      max-width: 100%;
+      min-height: 48px; // Better touch target
+      font-size: 1rem;
+      box-sizing: border-box;
+      white-space: normal; // Allow wrapping
+      word-wrap: break-word;
+    }
+
+    li {
+      width: 100%;
+      max-width: 100%;
+      border-bottom: 1px solid rgba($white, 0.1);
+      box-sizing: border-box;
+    }
+
+    ul {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+  }
+
+  // Mobile admin dropdown - accordion style
+  .adminDropdownItem.mobile {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+
+    .adminDropdownWrapper {
+      width: 100%;
+      max-width: 100%;
+      display: block;
+    }
+
+    .dropdownButton {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      justify-content: space-between;
+      padding: 0.875rem 1.5rem;
+      min-height: 48px;
+      font-size: 1rem;
+      border-bottom: 1px solid rgba($white, 0.1);
+      box-sizing: border-box;
+    }
+
+    .dropdownMenu {
+      position: static;
+      border: none;
+      border-radius: 0;
+      background-color: rgba(0, 0, 0, 0.08);
+      width: 100%;
+      max-width: 100%;
+      box-shadow: none;
+      animation: none;
+      box-sizing: border-box;
+
+      li {
+        border-bottom: 1px solid rgba($white, 0.05);
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        color: $white;
+
+        a {
+          padding-left: 2.5rem; // Indent submenu items
+          font-size: 0.95rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          white-space: normal; // Allow text wrapping
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          color: $white;
+        }
+
+        &.active {
+          color: $black;
+
+          a {
+            color: $black;
+          }
+        }
+
+        &:last-child {
+          border-radius: 0;
+        }
+      }
     }
   }
 
   .user {
-    height: 42px;
+    height: auto;
+    width: 100%;
+    border-bottom: 1px solid rgba($white, 0.1);
 
     a {
-      padding: 0 1rem;
+      padding: 0.875rem 1.5rem;
+      min-height: 48px;
 
       span {
         padding: 0;
@@ -162,12 +348,37 @@ nav {
   }
 
   .iconLink {
+    width: 100%;
+
     svg {
-      display: none;
+      margin-right: 0.75rem;
     }
   }
 
   .logout {
-    margin: 1rem 0;
+    margin: 1rem;
+    width: calc(100% - 2rem);
+
+    button {
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      min-height: 48px;
+      font-size: 1rem;
+      border-radius: 8px;
+    }
+  }
+
+  // Improve navbar toggle button
+  .navbar {
+    :global(.navbar-toggler) {
+      border: none;
+      padding: 0.5rem;
+
+      &:focus {
+        box-shadow: none;
+        outline: 2px solid rgba($white, 0.3);
+        outline-offset: 2px;
+      }
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { BsPersonCircle } from 'react-icons/bs';
 import { useNavigate } from 'react-router-dom';
 import { TertiaryButton } from '../common/Button/Buttons';
@@ -12,6 +12,7 @@ import { AdminDropdown } from './AdminDropdown';
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogoutButtonClick = useCallback(() => {
     localStorage.removeItem('accessToken');
@@ -21,6 +22,7 @@ export const Navbar: React.FC = () => {
     queryClient.clear();
 
     navigate('/login');
+    setIsMobileMenuOpen(false);
   }, [navigate, queryClient]);
 
   const { isAdmin, isBlender, isAdvancedBlender, isUser, isInstructor } =
@@ -28,14 +30,24 @@ export const Navbar: React.FC = () => {
   const fullName = getUserFullName();
 
   return (
-    <BootNavbar expand="lg">
+    <BootNavbar
+      expand="lg"
+      expanded={isMobileMenuOpen}
+      className={styles.navbar}
+    >
       <Container>
         <span className="navbar-brand d-block d-lg-none d-xl-none text-white">
           Täyttöpaikka
         </span>
-        <BootNavbar.Toggle aria-controls="basic-navbar-nav" />
-        <BootNavbar.Collapse id="basic-navbar-nav">
-          <div className="d-flex flex-row justify-content-between w-100">
+        <BootNavbar.Toggle
+          aria-controls="basic-navbar-nav"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        />
+        <BootNavbar.Collapse
+          id="basic-navbar-nav"
+          className={styles.navbarCollapse}
+        >
+          <div className="d-flex flex-row justify-content-between gap-2 w-100">
             <Nav>
               {(isUser || isAdmin) && (
                 <CustomLink to="/logbook">Paineilmatäyttö</CustomLink>
@@ -55,7 +67,10 @@ export const Navbar: React.FC = () => {
               <CustomLink to="/fill-events">Täyttöhistoria</CustomLink>
 
               {isAdmin && (
-                <AdminDropdown text="Ylläpito">
+                <AdminDropdown
+                  text="Ylläpito"
+                  isMobileMenuOpen={isMobileMenuOpen}
+                >
                   <CustomLink
                     className={styles.dropdownLink}
                     to="/admin/invoice"
@@ -80,7 +95,7 @@ export const Navbar: React.FC = () => {
                 </AdminDropdown>
               )}
             </Nav>
-            <Nav className="d-flex gap-2">
+            <Nav className="d-flex gap-2 justify-content-between">
               <div className={styles.user}>
                 <CustomLink to="/user">
                   <div className={styles.iconLink}>
@@ -93,6 +108,7 @@ export const Navbar: React.FC = () => {
                 <TertiaryButton
                   onClick={handleLogoutButtonClick}
                   text="Kirjaudu ulos"
+                  className={styles.logoutButton}
                 />
               </div>
             </Nav>
