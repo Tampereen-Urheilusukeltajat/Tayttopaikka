@@ -28,7 +28,7 @@ export const AdminDropdown: React.FC<AdminDropdownButtonProps> = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth <= 991 : false
+    typeof window !== 'undefined' ? window.innerWidth <= 991 : false,
   );
   const isActive = !!useMatch({ path: resolvedPath.pathname });
 

@@ -6,36 +6,17 @@
 app = "tayttopaikka-ui"
 primary_region = "ams"
 
-[[services]]
-  http_checks = []
-  internal_port = 80
-  processes = ["app"]
-  protocol = "tcp"
-  script_checks = []
-  [services.concurrency]
-    hard_limit = 25
-    soft_limit = 20
-    type = "connections"
-
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
-
-  [[services.tcp_checks]]
-    grace_period = "10s"
-    interval = "15s"
-    restart_limit = 0
-    timeout = "2s"
-
 [[statics]]
   guest_path = "/usr/share/nginx/html/"
   url_prefix = "/"
   
 [http_service]
+  internal_port = 80
+  force_https = true
   auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 1
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
