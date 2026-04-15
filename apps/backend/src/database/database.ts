@@ -13,13 +13,14 @@ let _knexController: Knex = knex(config[ENV]);
 
 // Create a proxy that properly forwards both property access and function calls
 export const knexController = new Proxy(
-  (...args: any[]) => _knexController(...args),
+  (...args: any[]) => _knexController(...(args as [any, ...any[]])),
+
   {
     get: (_, prop) => {
       return _knexController[prop as keyof Knex];
     },
     apply: (_, thisArg, args) => {
-      return _knexController(...args);
+      return _knexController(...(args as [any, ...any[]]));
     },
   },
 ) as unknown as Knex;
