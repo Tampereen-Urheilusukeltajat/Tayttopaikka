@@ -23,14 +23,12 @@ import { buildServer } from '../../../server';
 
 const VALID_PAYLOAD: CreateGasPriceBody = {
   activeFrom: new Date('2022-01-01').toISOString(),
-  activeTo: new Date('2022-12-31').toISOString(),
   gasId: '1',
   priceEurCents: 4,
 };
 
-const VALID_PAYLOAD_ACTIVE_TO_UNDEFINED: CreateGasPriceBody = {
+const VALID_PAYLOAD_NEW_HELIUM_PRICE: CreateGasPriceBody = {
   activeFrom: new Date('2023-02-01').toISOString(),
-  activeTo: undefined,
   gasId: '2',
   priceEurCents: 7,
 };
@@ -42,7 +40,6 @@ const INVALID_PAYLOAD: Partial<CreateGasPriceBody> = {
 
 const INVALID_PAYLOAD_NON_EXISTENT_GAS: CreateGasPriceBody = {
   activeFrom: new Date('2022-01-01').toISOString(),
-  activeTo: new Date('2022-12-31').toISOString(),
   gasId: '42',
   priceEurCents: 4,
 };
@@ -111,17 +108,18 @@ describe('Create gas price', () => {
       assert.strictEqual(dbGP.price_eur_cents, 4);
     });
 
-    test('responds 201 with undefined active_to parameter and manipulates existing gas price active time range', async () => {
+    test('creates new price and updates active_to of the previous Helium price', async () => {
       const [{ ...dbBeforeUpdatePreviousGP }] = await getTestKnex()(
         'gas_price',
-      ).where('id', '1');
+      ).where('gas_id', '2').orderBy('id', 'asc').limit(1);
 
+      const previousHeliumPriceId = dbBeforeUpdatePreviousGP.id;
       assert.ok(dbBeforeUpdatePreviousGP.active_to);
 
       const res = await server.inject({
         headers,
         method: 'POST',
-        payload: VALID_PAYLOAD_ACTIVE_TO_UNDEFINED,
+        payload: VALID_PAYLOAD_NEW_HELIUM_PRICE,
         url: 'api/gas/price',
       });
 
@@ -142,17 +140,13 @@ describe('Create gas price', () => {
       assert.strictEqual(dbGP.gas_id, 2);
       assert.strictEqual(dbGP.price_eur_cents, 7);
 
-      // Make sure it modified the existing gas price and set active_to correctly
+      // Make sure it modified the existing Helium gas price and set active_to correctly
       const [{ ...dbPreviousGP }] = await getTestKnex()('gas_price').where(
         'id',
-        '1',
+        previousHeliumPriceId,
       );
 
-      delete dbPreviousGP.created_at;
-      delete dbPreviousGP.updated_at;
-      delete dbPreviousGP.active_from;
-
-      assert.strictEqual(dbPreviousGP.gas_id, 1);
+      assert.strictEqual(dbPreviousGP.gas_id, 2);
       assert.ok(dbPreviousGP.active_to);
     });
   });
@@ -179,15 +173,16 @@ describe('Create gas price', () => {
       });
 
       const tokens = JSON.parse(loginRes.body);
-      headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
+      const nonAdminHeaders = { Authorization: 'Bearer ' + String(tokens.accessToken) };
 
       const res = await server.inject({
+        headers: nonAdminHeaders,
         method: 'POST',
         payload: VALID_PAYLOAD,
         url: 'api/gas/price',
       });
 
-      assert.deepStrictEqual(res.statusCode, 401);
+      assert.deepStrictEqual(res.statusCode, 403);
     });
 
     test('responds 400 if required body property is missing', async () => {

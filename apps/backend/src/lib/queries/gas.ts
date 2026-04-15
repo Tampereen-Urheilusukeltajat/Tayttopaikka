@@ -1,5 +1,5 @@
 import { type Knex } from 'knex';
-import { knexController } from '../../database/database';
+import { knexController, withinTransaction } from '../../database/database';
 import {
   type CreateGasPriceBody,
   type Gas,
@@ -56,8 +56,8 @@ export const getGasWithPricingWithPriceId = async (
 /**
  * This function only works when the following conditions are true
  * 1. There can only exist one price at a certain time
- * 2. The existing price has activeTo value of 9999-01-01 00:00:00
- * 3. currentDateTime <= activeFrom < 9999-01-01 00:00:00
+ * 2. The existing price has activeTo value of 9999-12-31 23:59:59
+ * 3. currentDateTime <= activeFrom < 9999-12-31 23:59:59
  *
  * This function MUST be modified when the application starts to support
  * creating dynamic price ranges
@@ -95,21 +95,19 @@ export const getGasWithPricingWithActiveFrom = async (
   return response[0][0];
 };
 
-export const createGasPrice = async (
+const createGasPriceWithTrx = async (
   { activeFrom, gasId, priceEurCents }: CreateGasPriceBody,
-  trx?: Knex.Transaction,
+  trx: Knex.Transaction,
 ): Promise<GasWithPricing> => {
-  const db = trx ?? (await knexController.transaction());
-
   // Find the current active price and update activeTo
   const activePrice = await getGasWithPricingWithActiveFrom(
     activeFrom,
     gasId,
-    db,
+    trx,
   );
 
   if (activePrice) {
-    await db.raw(
+    await trx.raw(
       `
       UPDATE gas_price
       SET active_to = :activeTo
@@ -132,7 +130,7 @@ export const createGasPrice = async (
     activeFrom: convertDateToMariaDBDateTime(new Date(activeFrom)),
   };
 
-  const res = await db.raw<Array<{ insertId: string }>>(
+  const res = await trx.raw<Array<{ insertId: string }>>(
     insertSql,
     insertParams,
   );
@@ -140,14 +138,16 @@ export const createGasPrice = async (
 
   const insertedGasWithPricing = await getGasWithPricingWithPriceId(
     insertedGasPriceId,
-    db,
+    trx,
   );
   if (!insertedGasWithPricing) throw new Error('Gas price creation failed');
 
-  await db.commit();
-
   return insertedGasWithPricing;
 };
+
+export const createGasPrice = async (
+  body: CreateGasPriceBody,
+): Promise<GasWithPricing> => withinTransaction((trx) => createGasPriceWithTrx(body, trx));
 
 export const getGasesWithPricing = async (
   trx?: Knex.Transaction,
