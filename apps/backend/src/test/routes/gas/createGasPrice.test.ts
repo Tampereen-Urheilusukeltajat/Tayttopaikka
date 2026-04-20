@@ -211,5 +211,29 @@ describe('Create gas price', () => {
       assert.deepStrictEqual(res.statusCode, 400);
       assert.strictEqual(JSON.parse(res.payload).message, 'Gas does not exist');
     });
+
+    test('responds 409 if a future price already exists for the gas', async () => {
+      // Create the first future price
+      await server.inject({
+        headers,
+        method: 'POST',
+        payload: VALID_PAYLOAD,
+        url: 'api/gas/price',
+      });
+
+      // Attempt to create a second future price for the same gas
+      const res = await server.inject({
+        headers,
+        method: 'POST',
+        payload: { ...VALID_PAYLOAD, activeFrom: new Date('2023-01-01').toISOString() },
+        url: 'api/gas/price',
+      });
+
+      assert.deepStrictEqual(res.statusCode, 409);
+      assert.strictEqual(
+        JSON.parse(res.payload).message,
+        'A future price already exists for this gas. Delete it first.',
+      );
+    });
   });
 });

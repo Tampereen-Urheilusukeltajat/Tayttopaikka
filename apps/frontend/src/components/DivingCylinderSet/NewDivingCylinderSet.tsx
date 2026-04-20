@@ -118,6 +118,7 @@ const NewDivingCylinderRow: React.FC<NewDivingCylinderRowProps> = ({
               ),
             });
           }}
+          className='w-100'
           type={ButtonType.button}
           element={<>Lisää pullo</>}
         />
