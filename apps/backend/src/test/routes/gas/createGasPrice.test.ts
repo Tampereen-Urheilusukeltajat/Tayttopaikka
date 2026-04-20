@@ -213,11 +213,17 @@ describe('Create gas price', () => {
     });
 
     test('responds 409 if a future price already exists for the gas', async () => {
+      const futurePricePayload: CreateGasPriceBody = {
+        gasId: '1',
+        priceEurCents: 4,
+        activeFrom: new Date('2030-01-01').toISOString(),
+      };
+
       // Create the first future price
       await server.inject({
         headers,
         method: 'POST',
-        payload: VALID_PAYLOAD,
+        payload: futurePricePayload,
         url: 'api/gas/price',
       });
 
@@ -225,7 +231,7 @@ describe('Create gas price', () => {
       const res = await server.inject({
         headers,
         method: 'POST',
-        payload: { ...VALID_PAYLOAD, activeFrom: new Date('2023-01-01').toISOString() },
+        payload: { ...futurePricePayload, activeFrom: new Date('2031-01-01').toISOString() },
         url: 'api/gas/price',
       });
 

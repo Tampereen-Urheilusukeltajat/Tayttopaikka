@@ -43,10 +43,13 @@ const buildTableRows = (prices: GasWithPricing[]): PriceRow[] => {
     }
   }
 
-  return Array.from(map.values()).map(({ current, future, past }) => {
+  const rows: PriceRow[] = [];
+  for (const { current, future, past } of map.values()) {
+    if (!current) continue;
     const subRows = [...future, ...past];
-    return { ...current!, subRows: subRows.length > 0 ? subRows : undefined };
-  });
+    rows.push({ ...current, subRows: subRows.length > 0 ? subRows : undefined });
+  }
+  return rows;
 };
 
 const formatDate = (iso: string): string => format(new Date(iso), 'dd.MM.yyyy');
@@ -159,6 +162,7 @@ export const GasPrices: React.FC = () => {
     [],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table v8 is not React Compiler-compatible; memoization is handled manually above
   const table = useReactTable<PriceRow>({
     data: tableData,
     columns,

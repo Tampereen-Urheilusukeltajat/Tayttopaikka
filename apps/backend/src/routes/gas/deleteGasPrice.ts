@@ -5,7 +5,7 @@ import {
 } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { errorHandler } from '../../lib/utils/errorHandler';
-import { deleteFutureGasPrice, getGasWithPricingWithPriceId } from '../../lib/queries/gas';
+import { deleteFutureGasPrice } from '../../lib/queries/gas';
 
 const schema = {
   description: 'Delete a future gas price',
@@ -25,14 +25,18 @@ const handler = async (
   reply: FastifyReply,
 ): Promise<void> => {
   const { gasPriceId } = request.params;
-  const price = await getGasWithPricingWithPriceId(gasPriceId);
-  if (!price) return errorHandler(reply, 404, 'Gas price not found');
 
-  if (new Date(price.activeFrom) <= new Date()) {
-    return errorHandler(reply, 400, 'Cannot delete a price that is already active');
+  try {
+    await deleteFutureGasPrice(gasPriceId);
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === 'Gas price not found')
+        return errorHandler(reply, 404, err.message);
+      if (err.message === 'Cannot delete a price that is already active')
+        return errorHandler(reply, 400, err.message);
+    }
+    throw err;
   }
-
-  await deleteFutureGasPrice(gasPriceId);
 
   return reply.code(204).send();
 };

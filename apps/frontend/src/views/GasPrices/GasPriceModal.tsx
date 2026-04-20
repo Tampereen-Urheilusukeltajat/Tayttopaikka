@@ -55,7 +55,7 @@ export const GasPriceModal: React.FC<Props> = ({ gas, onClose }) => {
     (values: FormValues) => {
       mutate({
         gasId: gas.gasId,
-        priceEurCents: parseFloat(values.priceEur) * 100,
+        priceEurCents: Math.round(parseFloat(values.priceEur) * 1000) / 10,
         activeFrom: `${values.activeFrom}T00:00:00Z`,
       });
     },
