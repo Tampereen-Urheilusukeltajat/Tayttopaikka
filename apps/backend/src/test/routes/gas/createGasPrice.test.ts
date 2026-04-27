@@ -23,7 +23,7 @@ import { buildServer } from '../../../server';
 
 const VALID_PAYLOAD: CreateGasPriceBody = {
   activeFrom: new Date('2022-01-01').toISOString(),
-  gasId: '1',
+  gasId: '3',
   priceEurCents: 4,
 };
 
@@ -93,8 +93,8 @@ describe('Create gas price', () => {
       assert.deepStrictEqual(res.statusCode, 201);
       const body: GasWithPricing = JSON.parse(res.body);
 
-      assert.strictEqual(body.gasId, '1');
-      assert.strictEqual(body.gasName, 'Air');
+      assert.strictEqual(body.gasId, '3');
+      assert.strictEqual(body.gasName, 'Oxygen');
       assert.strictEqual(body.priceEurCents, 4);
       assert.ok(body.gasPriceId);
 
@@ -104,7 +104,7 @@ describe('Create gas price', () => {
       );
       delete dbGP.created_at;
       delete dbGP.updated_at;
-      assert.strictEqual(dbGP.gas_id, 1);
+      assert.strictEqual(dbGP.gas_id, 3);
       assert.strictEqual(dbGP.price_eur_cents, 4);
     });
 
@@ -212,9 +212,21 @@ describe('Create gas price', () => {
       assert.strictEqual(JSON.parse(res.payload).message, 'Gas does not exist');
     });
 
+    test('responds 400 if trying to change the Air price', async () => {
+      const res = await server.inject({
+        headers,
+        method: 'POST',
+        payload: { ...VALID_PAYLOAD, gasId: '1', activeFrom: new Date('2030-01-01').toISOString() },
+        url: 'api/gas/price',
+      });
+
+      assert.deepStrictEqual(res.statusCode, 400);
+      assert.strictEqual(JSON.parse(res.payload).message, 'Air price cannot be changed');
+    });
+
     test('responds 409 if a future price already exists for the gas', async () => {
       const futurePricePayload: CreateGasPriceBody = {
-        gasId: '1',
+        gasId: '3',
         priceEurCents: 4,
         activeFrom: new Date('2030-01-01').toISOString(),
       };
