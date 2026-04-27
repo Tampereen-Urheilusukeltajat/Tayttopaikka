@@ -1,0 +1,1288 @@
+diff --git a/apps/backend/src/database/database.ts b/apps/backend/src/database/database.ts
+index e3b7800..c8a8e14 100644
+--- a/apps/backend/src/database/database.ts
++++ b/apps/backend/src/database/database.ts
+@@ -39,3 +39,20 @@ export const setKnexInstance = (knexInstance: Knex): void => {
+ export const getKnexInstance = (): Knex => {
+   return _knexController;
+ };
++
++/**
++ * Runs `fn` inside a transaction, committing on success and rolling back on error.
++ */
++export const withinTransaction = async <T>(
++  fn: (trx: Knex.Transaction) => Promise<T>,
++): Promise<T> => {
++  const trx = await knexController.transaction();
++  try {
++    const result = await fn(trx);
++    await trx.commit();
++    return result;
++  } catch (err) {
++    await trx.rollback();
++    throw err;
++  }
++};
+diff --git a/apps/backend/src/lib/queries/gas.ts b/apps/backend/src/lib/queries/gas.ts
+index b65ddd4..8f2ecc0 100644
+--- a/apps/backend/src/lib/queries/gas.ts
++++ b/apps/backend/src/lib/queries/gas.ts
+@@ -1,5 +1,5 @@
+ import { type Knex } from 'knex';
+-import { knexController } from '../../database/database';
++import { knexController, withinTransaction } from '../../database/database';
+ import {
+   type CreateGasPriceBody,
+   type Gas,
+@@ -56,8 +56,8 @@ export const getGasWithPricingWithPriceId = async (
+ /**
+  * This function only works when the following conditions are true
+  * 1. There can only exist one price at a certain time
+- * 2. The existing price has activeTo value of 9999-01-01 00:00:00
+- * 3. currentDateTime <= activeFrom < 9999-01-01 00:00:00
++ * 2. The existing price has activeTo value of 9999-12-31 23:59:59
++ * 3. currentDateTime <= activeFrom < 9999-12-31 23:59:59
+  *
+  * This function MUST be modified when the application starts to support
+  * creating dynamic price ranges
+@@ -95,21 +95,19 @@ export const getGasWithPricingWithActiveFrom = async (
+   return response[0][0];
+ };
+ 
+-export const createGasPrice = async (
++const createGasPriceWithTrx = async (
+   { activeFrom, gasId, priceEurCents }: CreateGasPriceBody,
+-  trx?: Knex.Transaction,
++  trx: Knex.Transaction,
+ ): Promise<GasWithPricing> => {
+-  const db = trx ?? (await knexController.transaction());
+-
+   // Find the current active price and update activeTo
+   const activePrice = await getGasWithPricingWithActiveFrom(
+     activeFrom,
+     gasId,
+-    db,
++    trx,
+   );
+ 
+   if (activePrice) {
+-    await db.raw(
++    await trx.raw(
+       `
+       UPDATE gas_price
+       SET active_to = :activeTo
+@@ -132,7 +130,7 @@ export const createGasPrice = async (
+     activeFrom: convertDateToMariaDBDateTime(new Date(activeFrom)),
+   };
+ 
+-  const res = await db.raw<Array<{ insertId: string }>>(
++  const res = await trx.raw<Array<{ insertId: string }>>(
+     insertSql,
+     insertParams,
+   );
+@@ -140,15 +138,17 @@ export const createGasPrice = async (
+ 
+   const insertedGasWithPricing = await getGasWithPricingWithPriceId(
+     insertedGasPriceId,
+-    db,
++    trx,
+   );
+   if (!insertedGasWithPricing) throw new Error('Gas price creation failed');
+ 
+-  await db.commit();
+-
+   return insertedGasWithPricing;
+ };
+ 
++export const createGasPrice = async (
++  body: CreateGasPriceBody,
++): Promise<GasWithPricing> => withinTransaction((trx) => createGasPriceWithTrx(body, trx));
++
+ export const getGasesWithPricing = async (
+   trx?: Knex.Transaction,
+ ): Promise<GasWithPricing[]> => {
+@@ -176,3 +176,73 @@ export const getGasesWithPricing = async (
+ 
+   return res[0] ?? [];
+ };
++
++export const getAllGasPrices = async (
++  trx?: Knex.Transaction,
++): Promise<GasWithPricing[]> => {
++  const db = trx ?? knexController;
++
++  const sql = `
++    SELECT
++      ${GAS_WITH_PRICING_COLUMNS}
++    FROM gas g
++    INNER JOIN
++      gas_price gp ON g.id = gp.gas_id
++    ORDER BY g.id ASC, gp.active_from DESC
++  `;
++
++  const res = await db.raw<GasWithPricing[][]>(sql);
++
++  return res[0] ?? [];
++};
++
++export const getFuturePriceForGas = async (
++  gasId: string,
++  trx?: Knex.Transaction,
++): Promise<GasWithPricing | undefined> => {
++  const db = trx ?? knexController;
++  const now = new Date(Date.now());
++
++  const sql = `
++    SELECT ${GAS_WITH_PRICING_COLUMNS}
++    FROM gas g
++    JOIN gas_price gp ON g.id = gp.gas_id
++    WHERE g.id = :gasId AND gp.active_from > :now
++    LIMIT 1
++  `;
++
++  const res = await db.raw<GasWithPricing[][]>(sql, { gasId, now });
++
++  return res[0][0];
++};
++
++export const deleteFutureGasPrice = async (
++  gasPriceId: string,
++): Promise<void> => {
++  await withinTransaction(async (trx) => {
++    const now = new Date(Date.now());
++
++    // Fetch the price to delete and confirm it is still in the future
++    const toDelete = await getGasWithPricingWithPriceId(gasPriceId, trx);
++    if (!toDelete) throw new Error('Gas price not found');
++    if (new Date(toDelete.activeFrom) <= now)
++      throw new Error('Cannot delete a price that is already active');
++
++    // Restore active_to on the price that was capped by this one (if any)
++    await trx.raw(
++      `
++      UPDATE gas_price
++      SET active_to = '9999-12-31 23:59:59'
++      WHERE gas_id = :gasId AND active_to = :activeFrom
++      `,
++      {
++        gasId: toDelete.gasId,
++        activeFrom: convertDateToMariaDBDateTime(new Date(toDelete.activeFrom)),
++      },
++    );
++
++    await trx.raw(`DELETE FROM gas_price WHERE id = :id`, {
++      id: gasPriceId,
++    });
++  });
++};
+diff --git a/apps/backend/src/lib/utils/dateTime.ts b/apps/backend/src/lib/utils/dateTime.ts
+index 5e690c9..c92136b 100644
+--- a/apps/backend/src/lib/utils/dateTime.ts
++++ b/apps/backend/src/lib/utils/dateTime.ts
+@@ -3,5 +3,7 @@
+  */
+ type DateTime = string;
+ 
++const pad = (n: number): string => String(n).padStart(2, '0');
++
+ export const convertDateToMariaDBDateTime = (date: Date): DateTime =>
+-  `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDay()} ${date.getUTCHours()}:${date.getUTCMinutes()}:${date.getUTCSeconds()}`;
++  `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+diff --git a/apps/backend/src/routes/gas/createGasPrice.ts b/apps/backend/src/routes/gas/createGasPrice.ts
+index d071f0b..3a2e881 100644
+--- a/apps/backend/src/routes/gas/createGasPrice.ts
++++ b/apps/backend/src/routes/gas/createGasPrice.ts
+@@ -4,7 +4,7 @@ import {
+   type FastifyRequest,
+ } from 'fastify';
+ import { errorHandler } from '../../lib/utils/errorHandler';
+-import { createGasPrice, getGasById } from '../../lib/queries/gas';
++import { createGasPrice, getGasById, getFuturePriceForGas } from '../../lib/queries/gas';
+ import {
+   createGasPriceBody,
+   type CreateGasPriceBody,
+@@ -20,6 +20,7 @@ const schema = {
+     400: { $ref: 'error' },
+     401: { $ref: 'error' },
+     403: { $ref: 'error' },
++    409: { $ref: 'error' },
+   },
+ };
+ 
+@@ -32,6 +33,14 @@ const handler = async (
+   const gasExists = await getGasById(request.body.gasId);
+   if (!gasExists) return errorHandler(reply, 400, 'Gas does not exist');
+ 
++  const futurePrice = await getFuturePriceForGas(request.body.gasId);
++  if (futurePrice)
++    return errorHandler(
++      reply,
++      409,
++      'A future price already exists for this gas. Delete it first.',
++    );
++
+   const gasWithPricing = await createGasPrice(request.body);
+ 
+   return reply.code(201).send(gasWithPricing);
+diff --git a/apps/backend/src/routes/gas/deleteGasPrice.ts b/apps/backend/src/routes/gas/deleteGasPrice.ts
+new file mode 100644
+index 0000000..fc37f2b
+--- /dev/null
++++ b/apps/backend/src/routes/gas/deleteGasPrice.ts
+@@ -0,0 +1,48 @@
++import {
++  type FastifyInstance,
++  type FastifyReply,
++  type FastifyRequest,
++} from 'fastify';
++import { Type } from '@sinclair/typebox';
++import { errorHandler } from '../../lib/utils/errorHandler';
++import { deleteFutureGasPrice, getGasWithPricingWithPriceId } from '../../lib/queries/gas';
++
++const schema = {
++  description: 'Delete a future gas price',
++  tags: ['gas price'],
++  params: Type.Object({ gasPriceId: Type.String() }),
++  response: {
++    204: Type.Null(),
++    400: { $ref: 'error' },
++    401: { $ref: 'error' },
++    403: { $ref: 'error' },
++    404: { $ref: 'error' },
++  },
++};
++
++const handler = async (
++  request: FastifyRequest<{ Params: { gasPriceId: string } }>,
++  reply: FastifyReply,
++): Promise<void> => {
++  const { gasPriceId } = request.params;
++  const price = await getGasWithPricingWithPriceId(gasPriceId);
++  if (!price) return errorHandler(reply, 404, 'Gas price not found');
++
++  if (new Date(price.activeFrom) <= new Date()) {
++    return errorHandler(reply, 400, 'Cannot delete a price that is already active');
++  }
++
++  await deleteFutureGasPrice(gasPriceId);
++
++  return reply.code(204).send();
++};
++
++export default async (fastify: FastifyInstance): Promise<void> => {
++  fastify.route({
++    method: 'DELETE',
++    url: '/price/:gasPriceId',
++    preValidation: [fastify['authenticate'], fastify['admin']],
++    handler,
++    schema,
++  });
++};
+diff --git a/apps/backend/src/routes/gas/getGasPrices.ts b/apps/backend/src/routes/gas/getGasPrices.ts
+new file mode 100644
+index 0000000..25ce15c
+--- /dev/null
++++ b/apps/backend/src/routes/gas/getGasPrices.ts
+@@ -0,0 +1,37 @@
++import {
++  type FastifyInstance,
++  type FastifyReply,
++  type FastifyRequest,
++} from 'fastify';
++import { gasWithPricing } from '../../types/gas.types';
++import { Type } from '@sinclair/typebox';
++import { getAllGasPrices } from '../../lib/queries/gas';
++
++const schema = {
++  description: 'Get all gas prices (current, past and future)',
++  tags: ['gas price'],
++  response: {
++    200: Type.Array(gasWithPricing),
++    401: { $ref: 'error' },
++    403: { $ref: 'error' },
++  },
++};
++
++const handler = async (
++  request: FastifyRequest,
++  reply: FastifyReply,
++): Promise<void> => {
++  const prices = await getAllGasPrices();
++
++  return reply.code(200).send(prices);
++};
++
++export default async (fastify: FastifyInstance): Promise<void> => {
++  fastify.route({
++    method: 'GET',
++    url: '/prices',
++    preValidation: [fastify['authenticate'], fastify['admin']],
++    handler,
++    schema,
++  });
++};
+diff --git a/apps/backend/src/test/lib/dateTime.test.ts b/apps/backend/src/test/lib/dateTime.test.ts
+new file mode 100644
+index 0000000..f44276a
+--- /dev/null
++++ b/apps/backend/src/test/lib/dateTime.test.ts
+@@ -0,0 +1,70 @@
++import { describe, it } from 'node:test';
++import assert from 'node:assert/strict';
++import { convertDateToMariaDBDateTime } from '../../lib/utils/dateTime';
++
++describe('convertDateToMariaDBDateTime', () => {
++  it('formats a basic UTC date correctly', () => {
++    const date = new Date('2024-06-15T10:30:45Z');
++    assert.strictEqual(
++      convertDateToMariaDBDateTime(date),
++      '2024-06-15 10:30:45',
++    );
++  });
++
++  it('zero-pads month to two digits', () => {
++    const date = new Date('2024-01-05T00:00:00Z');
++    const result = convertDateToMariaDBDateTime(date);
++    assert.match(result, /^2024-01-/);
++  });
++
++  it('zero-pads day of month to two digits', () => {
++    const date = new Date('2024-03-05T00:00:00Z');
++    const result = convertDateToMariaDBDateTime(date);
++    assert.match(result, /^2024-03-05/);
++  });
++
++  it('zero-pads hours, minutes and seconds', () => {
++    const date = new Date('2024-11-20T01:02:03Z');
++    assert.strictEqual(
++      convertDateToMariaDBDateTime(date),
++      '2024-11-20 01:02:03',
++    );
++  });
++
++  it('uses the day of the month, not the day of the week', () => {
++    // 2024-03-03 is a Sunday (getUTCDay() === 0), but the date is the 3rd
++    const date = new Date('2024-03-03T00:00:00Z');
++    const result = convertDateToMariaDBDateTime(date);
++    assert.match(result, /^2024-03-03/);
++  });
++
++  it('uses 1-indexed months (January is 01, not 00)', () => {
++    const date = new Date('2024-01-15T12:00:00Z');
++    const result = convertDateToMariaDBDateTime(date);
++    assert.match(result, /^2024-01-/);
++  });
++
++  it('uses 1-indexed months (December is 12)', () => {
++    const date = new Date('2024-12-31T23:59:59Z');
++    assert.strictEqual(
++      convertDateToMariaDBDateTime(date),
++      '2024-12-31 23:59:59',
++    );
++  });
++
++  it('handles midnight correctly', () => {
++    const date = new Date('2025-07-04T00:00:00Z');
++    assert.strictEqual(
++      convertDateToMariaDBDateTime(date),
++      '2025-07-04 00:00:00',
++    );
++  });
++
++  it('handles end-of-day boundary correctly', () => {
++    const date = new Date('2025-07-04T23:59:59Z');
++    assert.strictEqual(
++      convertDateToMariaDBDateTime(date),
++      '2025-07-04 23:59:59',
++    );
++  });
++});
+diff --git a/apps/backend/src/test/routes/gas/createGasPrice.test.ts b/apps/backend/src/test/routes/gas/createGasPrice.test.ts
+index a0b8cc2..e70cc85 100644
+--- a/apps/backend/src/test/routes/gas/createGasPrice.test.ts
++++ b/apps/backend/src/test/routes/gas/createGasPrice.test.ts
+@@ -23,14 +23,12 @@ import { buildServer } from '../../../server';
+ 
+ const VALID_PAYLOAD: CreateGasPriceBody = {
+   activeFrom: new Date('2022-01-01').toISOString(),
+-  activeTo: new Date('2022-12-31').toISOString(),
+   gasId: '1',
+   priceEurCents: 4,
+ };
+ 
+-const VALID_PAYLOAD_ACTIVE_TO_UNDEFINED: CreateGasPriceBody = {
++const VALID_PAYLOAD_NEW_HELIUM_PRICE: CreateGasPriceBody = {
+   activeFrom: new Date('2023-02-01').toISOString(),
+-  activeTo: undefined,
+   gasId: '2',
+   priceEurCents: 7,
+ };
+@@ -42,7 +40,6 @@ const INVALID_PAYLOAD: Partial<CreateGasPriceBody> = {
+ 
+ const INVALID_PAYLOAD_NON_EXISTENT_GAS: CreateGasPriceBody = {
+   activeFrom: new Date('2022-01-01').toISOString(),
+-  activeTo: new Date('2022-12-31').toISOString(),
+   gasId: '42',
+   priceEurCents: 4,
+ };
+@@ -111,17 +108,18 @@ describe('Create gas price', () => {
+       assert.strictEqual(dbGP.price_eur_cents, 4);
+     });
+ 
+-    test('responds 201 with undefined active_to parameter and manipulates existing gas price active time range', async () => {
++    test('creates new price and updates active_to of the previous Helium price', async () => {
+       const [{ ...dbBeforeUpdatePreviousGP }] = await getTestKnex()(
+         'gas_price',
+-      ).where('id', '1');
++      ).where('gas_id', '2').orderBy('id', 'asc').limit(1);
+ 
++      const previousHeliumPriceId = dbBeforeUpdatePreviousGP.id;
+       assert.ok(dbBeforeUpdatePreviousGP.active_to);
+ 
+       const res = await server.inject({
+         headers,
+         method: 'POST',
+-        payload: VALID_PAYLOAD_ACTIVE_TO_UNDEFINED,
++        payload: VALID_PAYLOAD_NEW_HELIUM_PRICE,
+         url: 'api/gas/price',
+       });
+ 
+@@ -142,17 +140,13 @@ describe('Create gas price', () => {
+       assert.strictEqual(dbGP.gas_id, 2);
+       assert.strictEqual(dbGP.price_eur_cents, 7);
+ 
+-      // Make sure it modified the existing gas price and set active_to correctly
++      // Make sure it modified the existing Helium gas price and set active_to correctly
+       const [{ ...dbPreviousGP }] = await getTestKnex()('gas_price').where(
+         'id',
+-        '1',
++        previousHeliumPriceId,
+       );
+ 
+-      delete dbPreviousGP.created_at;
+-      delete dbPreviousGP.updated_at;
+-      delete dbPreviousGP.active_from;
+-
+-      assert.strictEqual(dbPreviousGP.gas_id, 1);
++      assert.strictEqual(dbPreviousGP.gas_id, 2);
+       assert.ok(dbPreviousGP.active_to);
+     });
+   });
+@@ -179,15 +173,16 @@ describe('Create gas price', () => {
+       });
+ 
+       const tokens = JSON.parse(loginRes.body);
+-      headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
++      const nonAdminHeaders = { Authorization: 'Bearer ' + String(tokens.accessToken) };
+ 
+       const res = await server.inject({
++        headers: nonAdminHeaders,
+         method: 'POST',
+         payload: VALID_PAYLOAD,
+         url: 'api/gas/price',
+       });
+ 
+-      assert.deepStrictEqual(res.statusCode, 401);
++      assert.deepStrictEqual(res.statusCode, 403);
+     });
+ 
+     test('responds 400 if required body property is missing', async () => {
+@@ -216,5 +211,29 @@ describe('Create gas price', () => {
+       assert.deepStrictEqual(res.statusCode, 400);
+       assert.strictEqual(JSON.parse(res.payload).message, 'Gas does not exist');
+     });
++
++    test('responds 409 if a future price already exists for the gas', async () => {
++      // Create the first future price
++      await server.inject({
++        headers,
++        method: 'POST',
++        payload: VALID_PAYLOAD,
++        url: 'api/gas/price',
++      });
++
++      // Attempt to create a second future price for the same gas
++      const res = await server.inject({
++        headers,
++        method: 'POST',
++        payload: { ...VALID_PAYLOAD, activeFrom: new Date('2023-01-01').toISOString() },
++        url: 'api/gas/price',
++      });
++
++      assert.deepStrictEqual(res.statusCode, 409);
++      assert.strictEqual(
++        JSON.parse(res.payload).message,
++        'A future price already exists for this gas. Delete it first.',
++      );
++    });
+   });
+ });
+diff --git a/apps/backend/src/test/routes/gas/deleteGasPrice.test.ts b/apps/backend/src/test/routes/gas/deleteGasPrice.test.ts
+new file mode 100644
+index 0000000..73042b1
+--- /dev/null
++++ b/apps/backend/src/test/routes/gas/deleteGasPrice.test.ts
+@@ -0,0 +1,153 @@
++import {
++  describe,
++  test,
++  before,
++  after,
++  beforeEach,
++  afterEach,
++} from 'node:test';
++import assert from 'node:assert';
++import { type FastifyInstance } from 'fastify';
++import {
++  createTestDatabase,
++  dropTestDatabase,
++  startRedisConnection,
++  stopRedisConnection,
++  getTestKnex,
++} from '../../../lib/utils/testUtils';
++import { buildServer } from '../../../server';
++
++// IDs match test data: gas_price.csv
++// id=1: Air, active 2000-01-01 → 2099-06-01 (current, capped)
++// id=2: Air, active 2099-06-01 → 9999 (future, to be deleted)
++// id=3: Helium, active 2000-01-01 → 9999 (current, untouched)
++const FUTURE_PRICE_ID = '2';
++const CURRENT_PRICE_ID = '1';
++const HELIUM_PRICE_ID = '3';
++
++describe('Delete gas price', () => {
++  const getTestInstance = async (): Promise<FastifyInstance> =>
++    buildServer({ knex: getTestKnex(), routePrefix: 'api' });
++
++  before(async () => {
++    await createTestDatabase('delete_gas_price');
++    await startRedisConnection();
++  });
++
++  after(async () => {
++    await dropTestDatabase();
++    await stopRedisConnection();
++  });
++
++  let server: FastifyInstance;
++  let headers: { Authorization: string };
++
++  beforeEach(async () => {
++    server = await getTestInstance();
++    const res = await server.inject({
++      url: '/api/login',
++      method: 'POST',
++      payload: { email: 'test-admin@email.fi', password: 'password' },
++    });
++    headers = { Authorization: 'Bearer ' + String(JSON.parse(res.body).accessToken) };
++  });
++
++  afterEach(async () => {
++    await server.close();
++  });
++
++  describe('Happy path', () => {
++    test('responds 204 and removes the future price', async () => {
++      const res = await server.inject({
++        headers,
++        method: 'DELETE',
++        url: `api/gas/price/${FUTURE_PRICE_ID}`,
++      });
++
++      assert.strictEqual(res.statusCode, 204);
++
++      const rows = await getTestKnex()('gas_price').where('id', FUTURE_PRICE_ID);
++      assert.strictEqual(rows.length, 0);
++    });
++
++    test('restores active_to of the previous price to 9999 after deletion', async () => {
++      await server.inject({
++        headers,
++        method: 'DELETE',
++        url: `api/gas/price/${FUTURE_PRICE_ID}`,
++      });
++
++      const [restoredPrice] = await getTestKnex()('gas_price').where('id', CURRENT_PRICE_ID);
++      assert.strictEqual(
++        restoredPrice.active_to.toISOString().startsWith('9999'),
++        true,
++      );
++    });
++
++    test('leaves unrelated gas prices untouched', async () => {
++      await server.inject({
++        headers,
++        method: 'DELETE',
++        url: `api/gas/price/${FUTURE_PRICE_ID}`,
++      });
++
++      const [heliumPrice] = await getTestKnex()('gas_price').where('id', HELIUM_PRICE_ID);
++      assert.ok(heliumPrice);
++      assert.strictEqual(heliumPrice.gas_id, 2);
++    });
++  });
++
++  describe('Unhappy path', () => {
++    test('responds 401 without auth header', async () => {
++      const res = await server.inject({
++        method: 'DELETE',
++        url: `api/gas/price/${FUTURE_PRICE_ID}`,
++      });
++
++      assert.strictEqual(res.statusCode, 401);
++    });
++
++    test('responds 403 for non-admin', async () => {
++      const loginRes = await server.inject({
++        url: '/api/login',
++        method: 'POST',
++        payload: { email: 'test@email.fi', password: 'password' },
++      });
++      const nonAdminHeaders = {
++        Authorization: 'Bearer ' + String(JSON.parse(loginRes.body).accessToken),
++      };
++
++      const res = await server.inject({
++        headers: nonAdminHeaders,
++        method: 'DELETE',
++        url: `api/gas/price/${FUTURE_PRICE_ID}`,
++      });
++
++      assert.strictEqual(res.statusCode, 403);
++    });
++
++    test('responds 404 for non-existent price', async () => {
++      const res = await server.inject({
++        headers,
++        method: 'DELETE',
++        url: `api/gas/price/99999`,
++      });
++
++      assert.strictEqual(res.statusCode, 404);
++    });
++
++    test('responds 400 when trying to delete a currently active price', async () => {
++      const res = await server.inject({
++        headers,
++        method: 'DELETE',
++        url: `api/gas/price/${CURRENT_PRICE_ID}`,
++      });
++
++      assert.strictEqual(res.statusCode, 400);
++      assert.strictEqual(
++        JSON.parse(res.body).message,
++        'Cannot delete a price that is already active',
++      );
++    });
++  });
++});
+diff --git a/apps/backend/src/test_data/delete_gas_price/gas.csv b/apps/backend/src/test_data/delete_gas_price/gas.csv
+new file mode 100644
+index 0000000..98cbe3a
+--- /dev/null
++++ b/apps/backend/src/test_data/delete_gas_price/gas.csv
+@@ -0,0 +1,3 @@
++id;name;
++1;Air;
++2;Helium;
+diff --git a/apps/backend/src/test_data/delete_gas_price/gas_price.csv b/apps/backend/src/test_data/delete_gas_price/gas_price.csv
+new file mode 100644
+index 0000000..261be76
+--- /dev/null
++++ b/apps/backend/src/test_data/delete_gas_price/gas_price.csv
+@@ -0,0 +1,4 @@
++id;gas_id;price_eur_cents;active_from;active_to;
++1;1;100;2000-01-01 00:00:00;2099-06-01 00:00:00;
++2;1;200;2099-06-01 00:00:00;9999-12-31 23:59:59;
++3;2;300;2000-01-01 00:00:00;9999-12-31 23:59:59;
+diff --git a/apps/backend/src/test_data/delete_gas_price/user.csv b/apps/backend/src/test_data/delete_gas_price/user.csv
+new file mode 100644
+index 0000000..426debf
+--- /dev/null
++++ b/apps/backend/src/test_data/delete_gas_price/user.csv
+@@ -0,0 +1,3 @@
++id;email;phone_number;forename;surname;salt;password_hash;archived_at;deleted_at;created_at;updated_at;is_user;is_admin;is_advanced_blender;is_blender;is_instructor;
++a58fff36-4f75-11ed-96ae-77941df88822;test@email.fi;00001;Sauli;Sukeltaja;$2b$10$ikF8ObO.XnH2ItBkKcMZau;$2b$10$ikF8ObO.XnH2ItBkKcMZaufzOadky6bRVfQ7.JOOoGo3o8xBWadYy;;;2020-01-20 03:17:07;2020-01-20 03:17:07;1;0;0;1;0;
++a58fff36-4f75-11ed-96af-77941df88822;test-admin@email.fi;00004;Sauli;Sukeltaja;$2b$10$ikF8ObO.XnH2ItBkKcMZau;$2b$10$ikF8ObO.XnH2ItBkKcMZaufzOadky6bRVfQ7.JOOoGo3o8xBWadYy;;;2020-01-20 03:17:07;2020-01-20 03:17:07;1;1;0;1;0;
+diff --git a/apps/backend/src/types/fastify.d.ts b/apps/backend/src/types/fastify.d.ts
+new file mode 100644
+index 0000000..b34c28e
+--- /dev/null
++++ b/apps/backend/src/types/fastify.d.ts
+@@ -0,0 +1,10 @@
++/* eslint-disable @typescript-eslint/consistent-type-definitions */
++import { type preValidationHookHandler } from 'fastify';
++
++declare module 'fastify' {
++  interface FastifyInstance {
++    authenticate: preValidationHookHandler;
++    admin: preValidationHookHandler;
++    instructor: preValidationHookHandler;
++  }
++}
+diff --git a/apps/backend/src/types/gas.types.ts b/apps/backend/src/types/gas.types.ts
+index 847f599..614e976 100644
+--- a/apps/backend/src/types/gas.types.ts
++++ b/apps/backend/src/types/gas.types.ts
+@@ -26,9 +26,8 @@ export type GasWithPricing = Static<typeof gasWithPricing>;
+ 
+ export const createGasPriceBody = Type.Object({
+   gasId: Type.String(),
+-  priceEurCents: Type.Integer({ minimum: 0 }),
++  priceEurCents: Type.Number({ minimum: 0, multipleOf: 0.1 }),
+   activeFrom: Type.String({ format: 'date-time' }),
+-  activeTo: Type.Optional(Type.String({ format: 'date-time' })),
+ });
+ 
+ export type CreateGasPriceBody = Static<typeof createGasPriceBody>;
+diff --git a/apps/frontend/src/App.tsx b/apps/frontend/src/App.tsx
+index 1c47062..1baadf6 100644
+--- a/apps/frontend/src/App.tsx
++++ b/apps/frontend/src/App.tsx
+@@ -25,6 +25,7 @@ import { Footer } from './components/Footer/Footer';
+ import { InvoicePage } from './views/Invoice/Invoice';
+ import { UsersPage } from './views/Users/Users';
+ import { ArchivedUsersPage } from './views/ArchivedUsers/ArchivedUsers';
++import { GasPrices } from './views/GasPrices/GasPrices';
+ 
+ const QUERY_CLIENT = new QueryClient();
+ 
+@@ -84,6 +85,7 @@ const Content: React.FC = () => {
+             <Route path="invoice" element={<InvoicePage />} />
+             <Route path="users" element={<UsersPage />} />
+             <Route path="archived-users" element={<ArchivedUsersPage />} />
++            <Route path="gas-prices" element={<GasPrices />} />
+           </Route>
+ 
+           {/* 404 */}
+diff --git a/apps/frontend/src/components/DivingCylinderSet/NewDivingCylinderSet.tsx b/apps/frontend/src/components/DivingCylinderSet/NewDivingCylinderSet.tsx
+index e340f0a..8f017d3 100644
+--- a/apps/frontend/src/components/DivingCylinderSet/NewDivingCylinderSet.tsx
++++ b/apps/frontend/src/components/DivingCylinderSet/NewDivingCylinderSet.tsx
+@@ -118,6 +118,7 @@ const NewDivingCylinderRow: React.FC<NewDivingCylinderRowProps> = ({
+               ),
+             });
+           }}
++          className='w-100'
+           type={ButtonType.button}
+           element={<>Lisää pullo</>}
+         />
+diff --git a/apps/frontend/src/components/Navbar/Navbar.tsx b/apps/frontend/src/components/Navbar/Navbar.tsx
+index 31e7efa..3bf6daa 100644
+--- a/apps/frontend/src/components/Navbar/Navbar.tsx
++++ b/apps/frontend/src/components/Navbar/Navbar.tsx
+@@ -86,6 +86,12 @@ export const Navbar: React.FC = () => {
+                   >
+                     Arkistoidut käyttäjät
+                   </CustomLink>
++                  <CustomLink
++                    className={styles.dropdownLink}
++                    to="/admin/gas-prices"
++                  >
++                    Kaasujen hinnat
++                  </CustomLink>
+                   {/* <CustomLink
+                     className={styles.dropdownLink}
+                     to="/admin/filling-history"
+diff --git a/apps/frontend/src/components/common/Button/Buttons.module.scss b/apps/frontend/src/components/common/Button/Buttons.module.scss
+index bce4e07..ab18c95 100644
+--- a/apps/frontend/src/components/common/Button/Buttons.module.scss
++++ b/apps/frontend/src/components/common/Button/Buttons.module.scss
+@@ -64,7 +64,6 @@ $white: #ffffff;
+ 
+ .elementButton {
+   padding: 0.5rem 1rem;
+-  min-width: 100% !important;
+ 
+   &:hover:not(:disabled) {
+     background-color: $grey;
+diff --git a/apps/frontend/src/components/common/Button/Buttons.tsx b/apps/frontend/src/components/common/Button/Buttons.tsx
+index 4d0286d..184ba7f 100644
+--- a/apps/frontend/src/components/common/Button/Buttons.tsx
++++ b/apps/frontend/src/components/common/Button/Buttons.tsx
+@@ -27,6 +27,7 @@ export type ElementButtonProps = CommonButtonProps & {
+ };
+ 
+ export const ElementButton: React.FC<ElementButtonProps> = ({
++  className,
+   disabled,
+   key,
+   element,
+@@ -43,7 +44,7 @@ export const ElementButton: React.FC<ElementButtonProps> = ({
+   return (
+     <>
+       <button
+-        className={`${styles.commonButton} ${styles.elementButton}`}
++        className={`${styles.commonButton} ${styles.elementButton} ${className ?? ''}`}
+         data-tooltip-id={tooltipId}
+         data-tooltip-content={tooltip}
+         disabled={disabled}
+diff --git a/apps/frontend/src/lib/apiRequests/gasRequests.ts b/apps/frontend/src/lib/apiRequests/gasRequests.ts
+index 1097578..4cfa181 100644
+--- a/apps/frontend/src/lib/apiRequests/gasRequests.ts
++++ b/apps/frontend/src/lib/apiRequests/gasRequests.ts
+@@ -1,8 +1,35 @@
+ import { type GasWithPricing } from '../queries/gasQuery';
+-import { authGetAsync } from './api';
++import { authGetAsync, authPostAsync, authDeleteAsync } from './api';
++
++export type CreateGasPricePayload = {
++  gasId: string;
++  priceEurCents: number;
++  activeFrom: string;
++};
+ 
+ export const getGases = async (): Promise<GasWithPricing[]> => {
+   const response = await authGetAsync<GasWithPricing[]>('/api/gas');
+ 
+   return response.data;
+ };
++
++export const getAllGasPrices = async (): Promise<GasWithPricing[]> => {
++  const response = await authGetAsync<GasWithPricing[]>('/api/gas/prices');
++
++  return response.data;
++};
++
++export const deleteGasPrice = async (gasPriceId: string): Promise<void> => {
++  await authDeleteAsync(`/api/gas/price/${gasPriceId}`);
++};
++
++export const createGasPrice = async (
++  payload: CreateGasPricePayload,
++): Promise<GasWithPricing> => {
++  const response = await authPostAsync<GasWithPricing, CreateGasPricePayload>(
++    '/api/gas/price',
++    payload,
++  );
++
++  return response.data;
++};
+diff --git a/apps/frontend/src/lib/queries/gasMutations.ts b/apps/frontend/src/lib/queries/gasMutations.ts
+new file mode 100644
+index 0000000..bcd39a8
+--- /dev/null
++++ b/apps/frontend/src/lib/queries/gasMutations.ts
+@@ -0,0 +1,53 @@
++import { useMutation, useQueryClient } from '@tanstack/react-query';
++import { toast } from 'react-toastify';
++import {
++  createGasPrice,
++  deleteGasPrice,
++  type CreateGasPricePayload,
++} from '../apiRequests/gasRequests';
++import { type GasWithPricing } from './gasQuery';
++import { type UseMutation } from './common';
++import { GAS_QUERY, GAS_ALL_PRICES_QUERY } from './queryKeys';
++
++export const useCreateGasPriceMutation = (
++  onSuccess: () => void,
++): UseMutation<GasWithPricing, CreateGasPricePayload> => {
++  const queryClient = useQueryClient();
++  const { isPending, mutate, data, isError } = useMutation({
++    mutationFn: async (payload: CreateGasPricePayload) =>
++      createGasPrice(payload),
++    onSuccess: async () => {
++      await queryClient.invalidateQueries({ queryKey: GAS_QUERY });
++      await queryClient.invalidateQueries({ queryKey: GAS_ALL_PRICES_QUERY });
++      toast.success('Kaasun hinta päivitetty.');
++      onSuccess();
++    },
++    onError: () => {
++      toast.error('Hinnan päivitys epäonnistui. Yritä uudelleen.');
++    },
++    retry: 0,
++  });
++
++  return { isPending, mutate, data, isError };
++};
++
++export const useDeleteGasPriceMutation = (
++  onSuccess: () => void,
++): UseMutation<void, string> => {
++  const queryClient = useQueryClient();
++  const { isPending, mutate, data, isError } = useMutation({
++    mutationFn: async (gasPriceId: string) => deleteGasPrice(gasPriceId),
++    onSuccess: async () => {
++      await queryClient.invalidateQueries({ queryKey: GAS_QUERY });
++      await queryClient.invalidateQueries({ queryKey: GAS_ALL_PRICES_QUERY });
++      toast.success('Tuleva hinta poistettu.');
++      onSuccess();
++    },
++    onError: () => {
++      toast.error('Hinnan poisto epäonnistui. Yritä uudelleen.');
++    },
++    retry: 0,
++  });
++
++  return { isPending, mutate, data, isError };
++};
+diff --git a/apps/frontend/src/lib/queries/gasQuery.ts b/apps/frontend/src/lib/queries/gasQuery.ts
+index 91252ff..ed09a35 100644
+--- a/apps/frontend/src/lib/queries/gasQuery.ts
++++ b/apps/frontend/src/lib/queries/gasQuery.ts
+@@ -1,9 +1,9 @@
+ import { useQuery } from '@tanstack/react-query';
+ import { toast } from 'react-toastify';
+-import { getGases } from '../apiRequests/gasRequests';
++import { getGases, getAllGasPrices } from '../apiRequests/gasRequests';
+ import { type AvailableGasses } from '../utils';
+ import { type UseQuery } from './common';
+-import { GAS_QUERY } from './queryKeys';
++import { GAS_QUERY, GAS_ALL_PRICES_QUERY } from './queryKeys';
+ import { useEffect } from 'react';
+ 
+ export type GasWithPricing = {
+@@ -36,3 +36,19 @@ export const useGasesQuery = (): UseQuery<GasWithPricing[]> => {
+     isError,
+   };
+ };
++
++export const useAllGasPricesQuery = (): UseQuery<GasWithPricing[]> => {
++  const { isLoading, data, isError } = useQuery({
++    queryKey: GAS_ALL_PRICES_QUERY,
++    queryFn: async () => getAllGasPrices(),
++    retry: 1,
++  });
++
++  useEffect(() => {
++    if (isError) {
++      toast.error('Hintojen hakeminen epäonnistui. Yritä uudelleen.');
++    }
++  }, [isError]);
++
++  return { data, isLoading, isError };
++};
+diff --git a/apps/frontend/src/lib/queries/queryKeys.ts b/apps/frontend/src/lib/queries/queryKeys.ts
+index e3bbfb8..035baff 100644
+--- a/apps/frontend/src/lib/queries/queryKeys.ts
++++ b/apps/frontend/src/lib/queries/queryKeys.ts
+@@ -19,6 +19,7 @@ export const BARE_FILL_EVENT_QUERY_KEY = ['bareFillEvents'];
+ 
+ // Gas
+ export const GAS_QUERY = ['gas'];
++export const GAS_ALL_PRICES_QUERY = ['gasAllPrices'];
+ 
+ // Compressor
+ export const COMPRESSOR_QUERY_KEY = ['compressor'];
+diff --git a/apps/frontend/src/views/GasPrices/GasPriceModal.tsx b/apps/frontend/src/views/GasPrices/GasPriceModal.tsx
+new file mode 100644
+index 0000000..4fa707a
+--- /dev/null
++++ b/apps/frontend/src/views/GasPrices/GasPriceModal.tsx
+@@ -0,0 +1,100 @@
++import * as yup from 'yup';
++import { Formik, Form } from 'formik';
++import React, { useCallback } from 'react';
++import { Modal } from '../../components/common/Modal/Modal';
++import { TextInput } from '../../components/common/Inputs';
++import { type GasWithPricing } from '../../lib/queries/gasQuery';
++import { useCreateGasPriceMutation } from '../../lib/queries/gasMutations';
++import { mapGasToName } from '../../lib/utils';
++import { FIELD_NUMBER, FIELD_REQUIRED } from '../../lib/validationUtils';
++
++type Props = {
++  gas: GasWithPricing;
++  onClose: () => void;
++};
++
++type FormValues = {
++  priceEur: string;
++  activeFrom: string;
++};
++
++const getTomorrowString = (): string => {
++  const d = new Date();
++  d.setDate(d.getDate() + 1);
++  return d.toLocaleDateString('sv-SE'); // gives YYYY-MM-DD in local timezone
++};
++
++const VALIDATION_SCHEMA = yup.object().shape({
++  priceEur: yup
++    .number()
++    .required(FIELD_REQUIRED)
++    .min(0, 'Hinnan täytyy olla vähintään 0')
++    .max(99.999, 'Hinta ei voi ylittää 99,999 €/l')
++    .test(
++      'cents-precision',
++      'Hinnalla voi olla enintään 3 desimaalia (tarkkuus 0,001 €/l)',
++      (value) =>
++        value === undefined ||
++        Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-9,
++    )
++    .typeError(FIELD_NUMBER),
++  activeFrom: yup
++    .string()
++    .required(FIELD_REQUIRED)
++    .test(
++      'min-tomorrow',
++      'Voimaantulopäivä voi olla aikaisintaan huomenna',
++      (value) => !value || value >= getTomorrowString(),
++    ),
++});
++
++export const GasPriceModal: React.FC<Props> = ({ gas, onClose }) => {
++  const { mutate, isPending } = useCreateGasPriceMutation(onClose);
++
++  const handleSubmit = useCallback(
++    (values: FormValues) => {
++      mutate({
++        gasId: gas.gasId,
++        priceEurCents: parseFloat(values.priceEur) * 100,
++        activeFrom: `${values.activeFrom}T00:00:00Z`,
++      });
++    },
++    [mutate, gas.gasId],
++  );
++
++  const tomorrow = getTomorrowString();
++
++  return (
++    <Formik
++      initialValues={{ priceEur: '', activeFrom: tomorrow }}
++      validationSchema={VALIDATION_SCHEMA}
++      onSubmit={handleSubmit}
++    >
++      {({ errors, submitForm }) => (
++        <Modal
++          isOpen
++          onClose={onClose}
++          onConfirm={submitForm}
++          title={`Päivitä ${mapGasToName(gas.gasName)} hinta`}
++          confirmButtonText={isPending ? 'Tallennetaan...' : 'Tallenna'}
++        >
++          <Form>
++            <TextInput
++              label="Uusi hinta"
++              name="priceEur"
++              type="number"
++              unit="€/l"
++              errorText={errors.priceEur}
++            />
++            <TextInput
++              label="Voimaantulopäivä"
++              name="activeFrom"
++              type="date"
++              errorText={errors.activeFrom}
++            />
++          </Form>
++        </Modal>
++      )}
++    </Formik>
++  );
++};
+diff --git a/apps/frontend/src/views/GasPrices/GasPrices.tsx b/apps/frontend/src/views/GasPrices/GasPrices.tsx
+new file mode 100644
+index 0000000..8491eb2
+--- /dev/null
++++ b/apps/frontend/src/views/GasPrices/GasPrices.tsx
+@@ -0,0 +1,209 @@
++import React, { useCallback, useMemo } from 'react';
++import { Badge } from 'react-bootstrap';
++import { format } from 'date-fns';
++import { BsChevronDown, BsChevronRight, BsTrash } from 'react-icons/bs';
++import {
++  createColumnHelper,
++  getCoreRowModel,
++  getExpandedRowModel,
++  useReactTable,
++} from '@tanstack/react-table';
++import { useAllGasPricesQuery, type GasWithPricing } from '../../lib/queries/gasQuery';
++import { formatEurCentsToEur, mapGasToName } from '../../lib/utils';
++import { PrimaryButton, ElementButton } from '../../components/common/Button/Buttons';
++import { Modal } from '../../components/common/Modal/Modal';
++import { CommonTableV2 } from '../../components/common/Table/CommonTable-v2';
++import styles from '../../components/common/Table/CommonTable.module.scss';
++import { GasPriceModal } from './GasPriceModal';
++import { useDeleteGasPriceMutation } from '../../lib/queries/gasMutations';
++import { useState } from 'react';
++
++type PriceRow = GasWithPricing & {
++  subRows?: PriceRow[];
++};
++
++const buildTableRows = (prices: GasWithPricing[]): PriceRow[] => {
++  const now = new Date();
++  const map = new Map<string, { current?: PriceRow; future: PriceRow[]; past: PriceRow[] }>();
++
++  for (const price of prices) {
++    if (!map.has(price.gasId)) {
++      map.set(price.gasId, { future: [], past: [] });
++    }
++    const group = map.get(price.gasId)!;
++    const activeFrom = new Date(price.activeFrom);
++    const activeTo = price.activeTo ? new Date(price.activeTo) : null;
++
++    if (activeFrom > now) {
++      group.future.push(price);
++    } else if (activeTo !== null && activeTo <= now) {
++      group.past.push(price);
++    } else {
++      group.current = price;
++    }
++  }
++
++  return Array.from(map.values()).map(({ current, future, past }) => {
++    const subRows = [...future, ...past];
++    return { ...current!, subRows: subRows.length > 0 ? subRows : undefined };
++  });
++};
++
++const formatDate = (iso: string): string => format(new Date(iso), 'dd.MM.yyyy');
++const formatPrice = (cents: number): string => `${formatEurCentsToEur(cents)} €`;
++const formatActiveTo = (iso: string | undefined): string => {
++  if (!iso || iso.startsWith('9999')) return 'Toistaiseksi';
++  return formatDate(iso);
++};
++
++const columnHelper = createColumnHelper<PriceRow>();
++
++export const GasPrices: React.FC = () => {
++  const { data: prices, isLoading } = useAllGasPricesQuery();
++  const [editingGas, setEditingGas] = useState<GasWithPricing | null>(null);
++  const [deletingPrice, setDeletingPrice] = useState<GasWithPricing | null>(null);
++
++  const handleCloseModal = useCallback(() => setEditingGas(null), []);
++  const handleCloseDeleteModal = useCallback(() => setDeletingPrice(null), []);
++
++  const { mutate: doDelete, isPending: isDeleting } =
++    useDeleteGasPriceMutation(handleCloseDeleteModal);
++
++  const tableData = useMemo(() => buildTableRows(prices ?? []), [prices]);
++
++  const columns = useMemo(
++    () => [
++      columnHelper.accessor('gasName', {
++        header: 'Kaasu',
++        cell: (info) => {
++          const row = info.row;
++          if (row.depth !== 0) return null;
++          const Icon = row.getIsExpanded() ? BsChevronDown : BsChevronRight;
++          return (
++            <span
++              role="button"
++              onClick={row.getToggleExpandedHandler()}
++              className="d-flex align-items-center gap-2 user-select-none"
++            >
++              {row.getCanExpand() && <Icon size={12} />}
++              <strong>{mapGasToName(info.getValue())}</strong>
++            </span>
++          );
++        },
++      }),
++      columnHelper.accessor('priceEurCents', {
++        header: 'Hinta (€/l)',
++        cell: (info) => formatPrice(info.getValue()),
++      }),
++      columnHelper.display({
++        id: 'status',
++        header: 'Tila',
++        cell: (info) => {
++          const row = info.row;
++          const now = new Date();
++          const activeFrom = new Date(row.original.activeFrom);
++          const activeTo = row.original.activeTo
++            ? new Date(row.original.activeTo)
++            : null;
++
++          if (row.depth === 0) return <Badge bg="success">Voimassa</Badge>;
++          if (activeFrom > now) return <Badge bg="info" text="dark">Tuleva</Badge>;
++          if (activeTo !== null && activeTo <= now) return <Badge bg="secondary">Päättynyt</Badge>;
++          return null;
++        },
++      }),
++      columnHelper.accessor('activeFrom', {
++        header: 'Voimassa alkaen',
++        cell: (info) => formatDate(info.getValue()),
++      }),
++      columnHelper.accessor('activeTo', {
++        header: 'Voimassa asti',
++        cell: (info) => formatActiveTo(info.getValue()),
++      }),
++      columnHelper.display({
++        id: 'actions',
++        header: '',
++        cell: (info) => {
++          const row = info.row;
++          const now = new Date();
++
++          // Future sub-row: show trash icon
++          if (row.depth !== 0) {
++            if (new Date(row.original.activeFrom) > now) {
++              return (
++                <ElementButton
++                  element={<BsTrash className={styles.delete} />}
++                  tooltip="Poista tuleva hinta"
++                  className="w-2"
++                  onClick={() => setDeletingPrice(row.original)}
++                />
++              );
++            }
++            return null;
++          }
++
++          // Parent row: disable edit if a future price already exists
++          const hasFuture = row.subRows?.some(
++            (sub) => new Date(sub.original.activeFrom) > now,
++          );
++          return (
++            <PrimaryButton
++              text="Muokkaa hintaa"
++              disabled={hasFuture}
++              onClick={() => setEditingGas(row.original)}
++            />
++          );
++        },
++      }),
++    ],
++    [],
++  );
++
++  const table = useReactTable<PriceRow>({
++    data: tableData,
++    columns,
++    getSubRows: (row) => row.subRows,
++    getCoreRowModel: getCoreRowModel(),
++    getExpandedRowModel: getExpandedRowModel(),
++    initialState: { expanded: true },
++  });
++
++  if (isLoading) return null;
++
++  return (
++    <div>
++      <h2>Kaasujen hinnat</h2>
++      <p className="text-muted">
++        Taulukossa näkyy kaikkien kaasujen voimassaolevat hinnat sekä
++        hinnaston historia. Hinta on eurosenteissä per litra kaasua (vaihteluväli 0–99,999 €/l, enintään 3 desimaalia).
++        Uusi hinta tulee voimaan valittuna päivänä UTC-keskiyöllä (klo 02:00–03:00
++        Suomen aikaa vuodenajasta riippuen). Kullekin
++        kaasulle voi olla kerrallaan korkeintaan yksi tuleva hinta — poista se
++        ensin jos haluat asettaa uuden.
++      </p>
++      <CommonTableV2 table={table} />
++
++      {editingGas !== null && (
++        <GasPriceModal gas={editingGas} onClose={handleCloseModal} />
++      )}
++
++      {deletingPrice !== null && (
++        <Modal
++          isOpen
++          title="Poista tuleva hinta"
++          confirmButtonText={isDeleting ? 'Poistetaan...' : 'Poista'}
++          onConfirm={() => doDelete(String(deletingPrice.gasPriceId))}
++          onClose={handleCloseDeleteModal}
++        >
++          <p>
++            Olet poistamassa tulevan hinnan{' '}
++            <strong>{formatPrice(deletingPrice.priceEurCents)}</strong>, joka
++            olisi tullut voimaan{' '}
++            <strong>{formatDate(deletingPrice.activeFrom)}</strong>.
++          </p>
++          <p>Nykyinen hinta jatkuu toistaiseksi.</p>
++        </Modal>
++      )}
++    </div>
++  );
++};
