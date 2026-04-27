@@ -24,7 +24,7 @@ Static lookup table. Five gases are inserted by migration and never change:
 
 Each row represents a price for one gas over a half-open time interval `[active_from, active_to)`.
 
-```
+```text
 id | gas_id | price_eur_cents | active_from         | active_to
 ---+--------+-----------------+---------------------+---------------------
  1 |      2 |            6.00 | 2000-01-01 00:00:00 | 2026-04-01 00:00:00
@@ -32,6 +32,7 @@ id | gas_id | price_eur_cents | active_from         | active_to
 ```
 
 Rules enforced by application code:
+
 - Exactly **one** row per gas satisfies `active_from <= NOW < active_to` at any given moment — that is the **current price**.
 - At most **one** row per gas has `active_from > NOW` — that is the **future price** (optional).
 - All other rows are **past prices** (historical record, never deleted).
@@ -43,7 +44,7 @@ Rules enforced by application code:
 
 Links a fill event to the `gas_price` row that was active **at the time of the fill**. The price is locked at fill time — subsequent price changes do not affect historical fills.
 
-```
+```text
 fill_event_id | gas_price_id | storage_cylinder_id | volume_litres
 ```
 
@@ -86,6 +87,7 @@ The new price takes effect at UTC midnight of the chosen date (02:00–03:00 Fin
 `POST /api/fill-event`
 
 Within a single transaction:
+
 1. Looks up the currently active `gas_price` row for each gas used, using `active_from <= NOW AND active_to > NOW`.
 2. Records `fill_event_gas_fill` rows that reference those `gas_price` ids directly — the price is **frozen at this point**.
 3. Calculates the total cost server-side (`volume_litres × price_eur_cents` for each non-air fill) and compares it to the price the client submitted. Mismatch → 400. This prevents a client from submitting a stale price.
@@ -98,6 +100,7 @@ Volume is calculated as `ceil(startPressure - endPressure) × cylinderVolume` li
 `GET /api/invoicing` returns all users with unpaid fill events and their totals.
 
 A fill event is **unpaid** when:
+
 - It has no linked `payment_event`, or
 - Its only linked `payment_event` has status `FAILED`.
 
@@ -112,7 +115,7 @@ Invoice totals are computed as `SUM(volume_litres × price_eur_cents)` over all 
 ## Invariants
 
 | Invariant | Where enforced |
-|---|---|
+| --- | --- |
 | One current price per gas at any time | Application code (assert on SELECT, guard on INSERT) + `UNIQUE (gas_id, active_from)` index |
 | At most one future price per gas | 409 guard in `createGasPrice` + assert in `getFuturePriceForGas` + `UNIQUE (gas_id, active_to)` index (two open-ended rows for the same gas are impossible) |
 | Every gas always has a current price | Initial migration inserts zero-priced rows for all gases |
