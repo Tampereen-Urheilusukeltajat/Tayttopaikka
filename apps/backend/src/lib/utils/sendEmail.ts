@@ -11,11 +11,11 @@ const SCW_DEFAULT_PROJECT_ID: string | undefined =
 const FROM_EMAIL: string | undefined = process.env.TRANSACTIONAL_FROM_EMAIL;
 
 if (
-  SCW_ACCESS_KEY === undefined ||
-  SCW_SECRET_KEY === undefined ||
-  SCW_DEFAULT_ORGANIZATION_ID === undefined ||
-  SCW_DEFAULT_PROJECT_ID === undefined ||
-  FROM_EMAIL === undefined
+  !SCW_ACCESS_KEY ||
+  !SCW_SECRET_KEY ||
+  !SCW_DEFAULT_ORGANIZATION_ID ||
+  !SCW_DEFAULT_PROJECT_ID ||
+  !FROM_EMAIL
 ) {
   throw new Error(
     'sendEmail function has no required SCW secrets or "from" address!',

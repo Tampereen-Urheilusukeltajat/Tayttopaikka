@@ -43,7 +43,7 @@ services:
 
   # Redis Cache
   redis:
-    image: redis:7.0.5-alpine3.16
+    image: redis:8.2-alpine
     ports:
       - "6379:6379"
     volumes:
