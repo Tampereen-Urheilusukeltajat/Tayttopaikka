@@ -6,7 +6,7 @@ import {
 } from './payment';
 import { type MinifiedUserResponse } from '../../types/user.types';
 import { type InvoiceRow, type Invoice } from '../../types/invoices.types';
-import { knexController } from '../../database/database';
+import { withinTransaction } from '../../database/database';
 import { PaymentStatus } from '../../types/payment.types';
 import { type Knex } from 'knex';
 
@@ -81,24 +81,21 @@ const createInvoiceTableRows = async (
 export const createInvoicePaymentEvents = async (
   invoices: Invoice[],
   createdByUserId: string,
-): Promise<string[]> => {
-  const trx = await knexController.transaction();
-
-  const paymentEventIds = await Promise.all(
-    invoices.map(async (invoice) =>
-      createPaymentEvent(
-        invoice.user.id,
-        invoice.invoiceRows.map((ir) => ir.id),
-        invoice.invoiceTotal,
-        trx,
-        PaymentStatus.completed,
+): Promise<string[]> =>
+  withinTransaction(async (trx) => {
+    const paymentEventIds = await Promise.all(
+      invoices.map(async (invoice) =>
+        createPaymentEvent(
+          invoice.user.id,
+          invoice.invoiceRows.map((ir) => ir.id),
+          invoice.invoiceTotal,
+          trx,
+          PaymentStatus.completed,
+        ),
       ),
-    ),
-  );
+    );
 
-  await createInvoiceTableRows(paymentEventIds, createdByUserId, trx);
+    await createInvoiceTableRows(paymentEventIds, createdByUserId, trx);
 
-  await trx.commit();
-
-  return paymentEventIds;
-};
+    return paymentEventIds;
+  });

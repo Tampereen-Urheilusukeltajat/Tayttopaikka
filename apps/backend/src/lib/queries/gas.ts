@@ -147,7 +147,7 @@ const createGasPriceWithTrx = async (
 
 export const createGasPrice = async (
   body: CreateGasPriceBody,
-): Promise<GasWithPricing> => withinTransaction((trx) => createGasPriceWithTrx(body, trx));
+): Promise<GasWithPricing> => withinTransaction(async (trx) => createGasPriceWithTrx(body, trx));
 
 export const getGasesWithPricing = async (
   trx?: Knex.Transaction,
@@ -208,10 +208,13 @@ export const getFuturePriceForGas = async (
     FROM gas g
     JOIN gas_price gp ON g.id = gp.gas_id
     WHERE g.id = :gasId AND gp.active_from > :now
-    LIMIT 1
   `;
 
   const res = await db.raw<GasWithPricing[][]>(sql, { gasId, now });
+
+  if (res[0].length > 1) {
+    throw new Error('There can be only one future gas price per gas');
+  }
 
   return res[0][0];
 };
@@ -220,16 +223,21 @@ export const deleteFutureGasPrice = async (
   gasPriceId: string,
 ): Promise<void> => {
   await withinTransaction(async (trx) => {
-    const now = new Date(Date.now());
-
-    // Fetch the price to delete and confirm it is still in the future
+    // Fetch the price to get gasId/activeFrom for the UPDATE, and to give a 404 if it doesn't exist
     const toDelete = await getGasWithPricingWithPriceId(gasPriceId, trx);
     if (!toDelete) throw new Error('Gas price not found');
-    if (new Date(toDelete.activeFrom) <= now)
+
+    // Delete only if still in the future
+    const deleteRes = await trx.raw<[{ affectedRows: number }]>(
+      `DELETE FROM gas_price WHERE id = :id AND active_from > NOW()`,
+      { id: gasPriceId },
+    );
+
+    if (deleteRes[0].affectedRows === 0)
       throw new Error('Cannot delete a price that is already active');
 
-    // Restore active_to on the price that was capped by this one (if any)
-    await trx.raw(
+    // Restore active_to on the price that was capped by this one
+    const updateRes = await trx.raw<[{ affectedRows: number }]>(
       `
       UPDATE gas_price
       SET active_to = '9999-12-31 23:59:59'
@@ -241,8 +249,8 @@ export const deleteFutureGasPrice = async (
       },
     );
 
-    await trx.raw(`DELETE FROM gas_price WHERE id = :id`, {
-      id: gasPriceId,
-    });
+    if (updateRes[0].affectedRows !== 1) {
+      throw new Error('Expected exactly one preceding price to restore');
+    }
   });
 };
