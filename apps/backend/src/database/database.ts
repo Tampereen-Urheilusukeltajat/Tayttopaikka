@@ -39,3 +39,20 @@ export const setKnexInstance = (knexInstance: Knex): void => {
 export const getKnexInstance = (): Knex => {
   return _knexController;
 };
+
+/**
+ * Runs `fn` inside a transaction, committing on success and rolling back on error.
+ */
+export const withinTransaction = async <T>(
+  fn: (trx: Knex.Transaction) => Promise<T>,
+): Promise<T> => {
+  const trx = await knexController.transaction();
+  try {
+    const result = await fn(trx);
+    await trx.commit();
+    return result;
+  } catch (err) {
+    await trx.rollback();
+    throw err;
+  }
+};

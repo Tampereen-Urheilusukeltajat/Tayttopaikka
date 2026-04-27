@@ -1,5 +1,5 @@
 import { type Knex } from 'knex';
-import { knexController } from '../../database/database';
+import { knexController, withinTransaction } from '../../database/database';
 import {
   type CreateGasPriceBody,
   type Gas,
@@ -56,8 +56,8 @@ export const getGasWithPricingWithPriceId = async (
 /**
  * This function only works when the following conditions are true
  * 1. There can only exist one price at a certain time
- * 2. The existing price has activeTo value of 9999-01-01 00:00:00
- * 3. currentDateTime <= activeFrom < 9999-01-01 00:00:00
+ * 2. The existing price has activeTo value of 9999-12-31 23:59:59
+ * 3. currentDateTime <= activeFrom < 9999-12-31 23:59:59
  *
  * This function MUST be modified when the application starts to support
  * creating dynamic price ranges
@@ -95,21 +95,19 @@ export const getGasWithPricingWithActiveFrom = async (
   return response[0][0];
 };
 
-export const createGasPrice = async (
+const createGasPriceWithTrx = async (
   { activeFrom, gasId, priceEurCents }: CreateGasPriceBody,
-  trx?: Knex.Transaction,
+  trx: Knex.Transaction,
 ): Promise<GasWithPricing> => {
-  const db = trx ?? (await knexController.transaction());
-
   // Find the current active price and update activeTo
   const activePrice = await getGasWithPricingWithActiveFrom(
     activeFrom,
     gasId,
-    db,
+    trx,
   );
 
   if (activePrice) {
-    await db.raw(
+    await trx.raw(
       `
       UPDATE gas_price
       SET active_to = :activeTo
@@ -132,7 +130,7 @@ export const createGasPrice = async (
     activeFrom: convertDateToMariaDBDateTime(new Date(activeFrom)),
   };
 
-  const res = await db.raw<Array<{ insertId: string }>>(
+  const res = await trx.raw<Array<{ insertId: string }>>(
     insertSql,
     insertParams,
   );
@@ -140,14 +138,16 @@ export const createGasPrice = async (
 
   const insertedGasWithPricing = await getGasWithPricingWithPriceId(
     insertedGasPriceId,
-    db,
+    trx,
   );
   if (!insertedGasWithPricing) throw new Error('Gas price creation failed');
 
-  await db.commit();
-
   return insertedGasWithPricing;
 };
+
+export const createGasPrice = async (
+  body: CreateGasPriceBody,
+): Promise<GasWithPricing> => withinTransaction(async (trx) => createGasPriceWithTrx(body, trx));
 
 export const getGasesWithPricing = async (
   trx?: Knex.Transaction,
@@ -175,4 +175,82 @@ export const getGasesWithPricing = async (
   const res = await db.raw<GasWithPricing[][]>(sql, params);
 
   return res[0] ?? [];
+};
+
+export const getAllGasPrices = async (
+  trx?: Knex.Transaction,
+): Promise<GasWithPricing[]> => {
+  const db = trx ?? knexController;
+
+  const sql = `
+    SELECT
+      ${GAS_WITH_PRICING_COLUMNS}
+    FROM gas g
+    INNER JOIN
+      gas_price gp ON g.id = gp.gas_id
+    ORDER BY g.id ASC, gp.active_from DESC
+  `;
+
+  const res = await db.raw<GasWithPricing[][]>(sql);
+
+  return res[0] ?? [];
+};
+
+export const getFuturePriceForGas = async (
+  gasId: string,
+  trx?: Knex.Transaction,
+): Promise<GasWithPricing | undefined> => {
+  const db = trx ?? knexController;
+  const now = new Date(Date.now());
+
+  const sql = `
+    SELECT ${GAS_WITH_PRICING_COLUMNS}
+    FROM gas g
+    JOIN gas_price gp ON g.id = gp.gas_id
+    WHERE g.id = :gasId AND gp.active_from > :now
+  `;
+
+  const res = await db.raw<GasWithPricing[][]>(sql, { gasId, now });
+
+  if (res[0].length > 1) {
+    throw new Error('There can be only one future gas price per gas');
+  }
+
+  return res[0][0];
+};
+
+export const deleteFutureGasPrice = async (
+  gasPriceId: string,
+): Promise<void> => {
+  await withinTransaction(async (trx) => {
+    // Fetch the price to get gasId/activeFrom for the UPDATE, and to give a 404 if it doesn't exist
+    const toDelete = await getGasWithPricingWithPriceId(gasPriceId, trx);
+    if (!toDelete) throw new Error('Gas price not found');
+
+    // Delete only if still in the future
+    const deleteRes = await trx.raw<[{ affectedRows: number }]>(
+      `DELETE FROM gas_price WHERE id = :id AND active_from > NOW()`,
+      { id: gasPriceId },
+    );
+
+    if (deleteRes[0].affectedRows === 0)
+      throw new Error('Cannot delete a price that is already active');
+
+    // Restore active_to on the price that was capped by this one
+    const updateRes = await trx.raw<[{ affectedRows: number }]>(
+      `
+      UPDATE gas_price
+      SET active_to = '9999-12-31 23:59:59'
+      WHERE gas_id = :gasId AND active_to = :activeFrom
+      `,
+      {
+        gasId: toDelete.gasId,
+        activeFrom: convertDateToMariaDBDateTime(new Date(toDelete.activeFrom)),
+      },
+    );
+
+    if (updateRes[0].affectedRows !== 1) {
+      throw new Error('Expected exactly one preceding price to restore');
+    }
+  });
 };

@@ -26,9 +26,8 @@ export type GasWithPricing = Static<typeof gasWithPricing>;
 
 export const createGasPriceBody = Type.Object({
   gasId: Type.String(),
-  priceEurCents: Type.Integer({ minimum: 0 }),
+  priceEurCents: Type.Number({ minimum: 0, multipleOf: 0.1 }),
   activeFrom: Type.String({ format: 'date-time' }),
-  activeTo: Type.Optional(Type.String({ format: 'date-time' })),
 });
 
 export type CreateGasPriceBody = Static<typeof createGasPriceBody>;

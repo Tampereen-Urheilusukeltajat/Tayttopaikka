@@ -1,4 +1,4 @@
-import { knexController } from '../../database/database';
+import { knexController, withinTransaction } from '../../database/database';
 import {
   type CreateFillEventBody,
   type FillEventGasFill,
@@ -20,8 +20,8 @@ const getActivePriceId = async (
 ): Promise<number> => {
   const prices: GasPrice[] = await trx<GasPrice>('gas_price')
     .where('gas_id', gasId)
-    .andWhere('active_to', '>=', knexController.fn.now())
-    .andWhere('active_from', '<', knexController.fn.now())
+    .andWhere('active_from', '<=', knexController.fn.now())
+    .andWhere('active_to', '>', knexController.fn.now())
     .select('id');
 
   const pricesArr = prices.map((price) => JSON.parse(JSON.stringify(price)));
@@ -53,40 +53,45 @@ export const getFillEvents = async (
 ): Promise<GetFillEventsResponse[]> => {
   const trx = await knexController.transaction();
 
-  const fillQuery = (await trx('fill_event')
-    .where('user_id', userId)
-    .innerJoin(
-      'diving_cylinder_set',
-      'fill_event.cylinder_set_id',
-      'diving_cylinder_set.id',
-    )
-    .leftJoin('compressor', 'fill_event.compressor_id', 'compressor.id')
-    .select(
-      'fill_event.id',
-      'fill_event.user_id as userId',
-      'diving_cylinder_set.name as cylinderSetName',
-      'diving_cylinder_set.id as cylinderSetId',
-      'fill_event.gas_mixture as gasMixture',
-      'fill_event.description',
-      'fill_event.created_at as createdAt',
-      'compressor.id as compressorId',
-      'compressor.name as compressorName',
-    )) as Array<Omit<GetFillEventsResponse, 'price'>>;
+  try {
+    const fillQuery = (await trx('fill_event')
+      .where('user_id', userId)
+      .innerJoin(
+        'diving_cylinder_set',
+        'fill_event.cylinder_set_id',
+        'diving_cylinder_set.id',
+      )
+      .leftJoin('compressor', 'fill_event.compressor_id', 'compressor.id')
+      .select(
+        'fill_event.id',
+        'fill_event.user_id as userId',
+        'diving_cylinder_set.name as cylinderSetName',
+        'diving_cylinder_set.id as cylinderSetId',
+        'fill_event.gas_mixture as gasMixture',
+        'fill_event.description',
+        'fill_event.created_at as createdAt',
+        'compressor.id as compressorId',
+        'compressor.name as compressorName',
+      )) as Array<Omit<GetFillEventsResponse, 'price'>>;
 
-  const result = await Promise.all(
-    fillQuery.map(async (fillEvent): Promise<GetFillEventsResponse> => {
-      const price = await calcTotalCost(trx, Number(fillEvent.id));
+    const result = await Promise.all(
+      fillQuery.map(async (fillEvent): Promise<GetFillEventsResponse> => {
+        const price = await calcTotalCost(trx, Number(fillEvent.id));
 
-      return {
-        ...fillEvent,
+        return {
+          ...fillEvent,
 
-        price,
-      };
-    }),
-  );
+          price,
+        };
+      }),
+    );
 
-  await trx.commit();
-  return result;
+    await trx.commit();
+    return result;
+  } catch (err) {
+    await trx.rollback();
+    throw err;
+  }
 };
 
 export const createFillEvent = async (
@@ -108,73 +113,83 @@ export const createFillEvent = async (
     return errorHandler(reply, 400, 'No gases were given');
   }
 
-  const trx = await knexController.transaction();
-  const user = await getUserWithId(authUser.id, true, trx);
-
-  if (user === undefined) return errorHandler(reply, 500);
-
-  if (
-    !(user.isBlender || user.isAdvancedBlender || user.isAdmin) &&
-    storageCylinderUsageArr.length !== 0
-  ) {
-    await trx.rollback();
-    return errorHandler(reply, 403, 'User does not have blender privileges');
-  }
-
-  const set = await selectCylinderSet(trx, cylinderSetId);
-  if (set === undefined) {
-    await trx.rollback();
-    return errorHandler(reply, 400, 'Cylinder set was not found');
-  }
-  const params: Array<string | null> = [user.id, cylinderSetId, gasMixture];
-  const sql =
-    'INSERT INTO fill_event (user_id, cylinder_set_id, gas_mixture, compressor_id, description) VALUES (?,?,?,?,?) RETURNING id';
-
-  params.push(compressorId ?? null);
-  params.push(description ?? null);
-
-  // Use knex.raw to enable use of RETURNING clause to avoid race conditions
-  const res = await trx.raw(sql, params);
-  const fillEventId = JSON.parse(JSON.stringify(res))[0][0].id as number;
+  let fillEventId: number;
+  let userId: string;
 
   try {
-    if (filledAir) {
-      // If air is filled, save it
-      const airGasId = await getAirGasId(trx);
-      const airPriceId = await getActivePriceId(trx, airGasId);
-      await trx('fill_event_gas_fill').insert({
-        fill_event_id: fillEventId,
-        gas_price_id: airPriceId,
-      });
-    }
-    await Promise.all(
-      // Save gas fills
-      storageCylinderUsageArr.map(async (scu): Promise<void> => {
-        if (scu.startPressure < scu.endPressure) {
-          throw new Error('Negative fill pressure');
-        }
-        const storageCylinder = await getStorageCylinder(
-          trx,
-          scu.storageCylinderId,
-        );
-        const priceId = await getActivePriceId(trx, storageCylinder.gasId);
+    ({ fillEventId, userId } = await withinTransaction(async (trx) => {
+      const user = await getUserWithId(authUser.id, true, trx);
+      if (user === undefined) throw new Error('User not found');
+
+      if (
+        !(user.isBlender || user.isAdvancedBlender || user.isAdmin) &&
+        storageCylinderUsageArr.length !== 0
+      ) {
+        throw new Error('No blender privileges');
+      }
+
+      const set = await selectCylinderSet(trx, cylinderSetId);
+      if (set === undefined) throw new Error('Cylinder set not found');
+
+      const params: Array<string | null> = [user.id, cylinderSetId, gasMixture];
+      const sql =
+        'INSERT INTO fill_event (user_id, cylinder_set_id, gas_mixture, compressor_id, description) VALUES (?,?,?,?,?) RETURNING id';
+      params.push(compressorId ?? null);
+      params.push(description ?? null);
+
+      // Use knex.raw to enable use of RETURNING clause to avoid race conditions
+      const res = await trx.raw(sql, params);
+      const id = JSON.parse(JSON.stringify(res))[0][0].id as number;
+
+      if (filledAir) {
+        const airGasId = await getAirGasId(trx);
+        const airPriceId = await getActivePriceId(trx, airGasId);
         await trx('fill_event_gas_fill').insert({
-          fill_event_id: fillEventId,
-          gas_price_id: priceId,
-          storage_cylinder_id: storageCylinder.id,
-          volume_litres:
-            Math.ceil(scu.startPressure - scu.endPressure) *
-            storageCylinder.volume,
+          fill_event_id: id,
+          gas_price_id: airPriceId,
         });
-      }),
-    );
+      }
+
+      await Promise.all(
+        storageCylinderUsageArr.map(async (scu): Promise<void> => {
+          if (scu.startPressure < scu.endPressure) {
+            throw new Error('Negative fill pressure');
+          }
+          const storageCylinder = await getStorageCylinder(
+            trx,
+            scu.storageCylinderId,
+          );
+          const priceId = await getActivePriceId(trx, storageCylinder.gasId);
+          await trx('fill_event_gas_fill').insert({
+            fill_event_id: id,
+            gas_price_id: priceId,
+            storage_cylinder_id: storageCylinder.id,
+            volume_litres:
+              Math.ceil(scu.startPressure - scu.endPressure) *
+              storageCylinder.volume,
+          });
+        }),
+      );
+
+      // Check that the price advertised to the user is correct
+      const totalCost = await calcTotalCost(trx, id);
+      if (totalCost !== price) throw new Error('Price mismatch');
+
+      return { fillEventId: id, userId: user.id };
+    }));
   } catch (e) {
-    await trx.rollback();
-    log.error(e.message);
-    log.debug(user.id);
+    const message = e instanceof Error ? e.message : String(e);
+    log.error(message);
+    log.debug(authUser.id);
     log.debug(body);
 
-    switch (e.message) {
+    switch (message) {
+      case 'User not found':
+        return errorHandler(reply, 500);
+      case 'No blender privileges':
+        return errorHandler(reply, 403, 'User does not have blender privileges');
+      case 'Cylinder set not found':
+        return errorHandler(reply, 400, 'Cylinder set was not found');
       case 'Storage cylinder not found':
         return errorHandler(reply, 400, 'Invalid storage cylinder');
       case 'Price not found':
@@ -185,21 +200,16 @@ export const createFillEvent = async (
         return errorHandler(reply, 500);
       case 'Negative fill pressure':
         return errorHandler(reply, 400, 'Cannot have negative fill pressure');
+      case 'Price mismatch':
+        return errorHandler(reply, 400, 'Client price did not match server price');
       default:
         return errorHandler(reply, 500);
     }
   }
-  // Check that the price advertised to the user is correct
-  const totalCost = await calcTotalCost(trx, fillEventId);
-  if (totalCost !== price) {
-    await trx.rollback();
-    return errorHandler(reply, 400, 'Client price did not match server price');
-  }
-  await trx.commit();
 
   return reply.code(201).send({
     id: fillEventId,
-    userId: user.id,
+    userId,
     ...body,
   });
 };
