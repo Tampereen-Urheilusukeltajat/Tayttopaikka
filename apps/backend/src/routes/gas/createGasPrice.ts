@@ -32,6 +32,8 @@ const handler = async (
 ): Promise<void> => {
   const gasExists = await getGasById(request.body.gasId);
   if (!gasExists) return errorHandler(reply, 400, 'Gas does not exist');
+  if (gasExists.name === 'Air')
+    return errorHandler(reply, 400, 'Air price cannot be changed');
 
   const futurePrice = await getFuturePriceForGas(request.body.gasId);
   if (futurePrice)

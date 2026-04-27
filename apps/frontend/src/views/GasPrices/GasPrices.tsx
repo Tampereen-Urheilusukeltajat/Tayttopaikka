@@ -140,10 +140,12 @@ export const GasPrices: React.FC = () => {
             return null;
           }
 
-          // Parent row: disable edit if a future price already exists
+          // Parent row: disable edit if a future price already exists or gas is Air
+          const isAir = row.original.gasName === 'Air';
           const hasFuture = row.subRows?.some(
             (sub) => new Date(sub.original.activeFrom) > now,
           );
+          if (isAir) return null;
           return (
             <PrimaryButton
               text="Muokkaa hintaa"
