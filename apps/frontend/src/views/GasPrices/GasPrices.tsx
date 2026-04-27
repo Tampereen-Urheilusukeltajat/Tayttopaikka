@@ -24,32 +24,27 @@ type PriceRow = GasWithPricing & {
 
 const buildTableRows = (prices: GasWithPricing[]): PriceRow[] => {
   const now = new Date();
-  const map = new Map<string, { current?: PriceRow; future: PriceRow[]; past: PriceRow[] }>();
 
-  for (const price of prices) {
-    if (!map.has(price.gasId)) {
-      map.set(price.gasId, { future: [], past: [] });
-    }
-    const group = map.get(price.gasId)!;
-    const activeFrom = new Date(price.activeFrom);
-    const activeTo = price.activeTo ? new Date(price.activeTo) : null;
+  const isFuture = (p: GasWithPricing): boolean => new Date(p.activeFrom) > now;
+  const isPast = (p: GasWithPricing): boolean =>
+    p.activeTo !== undefined && new Date(p.activeTo) <= now;
+  const isCurrent = (p: GasWithPricing): boolean => !isFuture(p) && !isPast(p);
 
-    if (activeFrom > now) {
-      group.future.push(price);
-    } else if (activeTo !== null && activeTo <= now) {
-      group.past.push(price);
-    } else {
-      group.current = price;
-    }
-  }
+  const byGas = prices.reduce<Map<string, GasWithPricing[]>>((acc, price) => {
+    acc.set(price.gasId, [...(acc.get(price.gasId) ?? []), price]);
+    return acc;
+  }, new Map());
 
-  const rows: PriceRow[] = [];
-  for (const { current, future, past } of map.values()) {
-    if (!current) continue;
-    const subRows = [...future, ...past];
-    rows.push({ ...current, subRows: subRows.length > 0 ? subRows : undefined });
-  }
-  return rows;
+  return Array.from(byGas.values()).flatMap((group) => {
+    const current = group.find(isCurrent);
+    if (!current) return [];
+
+    const future = group.find(isFuture); // at most one per spec
+    const past = group.filter(isPast);
+    const subRows = [...(future ? [future] : []), ...past];
+
+    return [{ ...current, subRows: subRows.length > 0 ? subRows : undefined }];
+  });
 };
 
 const formatDate = (iso: string): string => format(new Date(iso), 'dd.MM.yyyy');
