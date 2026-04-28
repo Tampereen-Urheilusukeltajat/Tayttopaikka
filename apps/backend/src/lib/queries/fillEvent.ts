@@ -4,11 +4,13 @@ import {
   type FillEventGasFill,
   type GetFillEventsResponse,
 } from '../../types/fillEvent.types';
+import { type DiluentCylinderUsage } from '../../types/storageCylinder.types';
 import { type AuthUser } from '../../types/auth.types';
 import { log } from '../utils/log';
 import { type Knex } from 'knex';
-import { getStorageCylinder } from './storageCylinder';
+import { getStorageCylinder, getStorageCylinderWithGasName } from './storageCylinder';
 import { type Gas, type GasPrice } from '../../types/gas.types';
+import { getDiluentPrice } from './gas';
 import { selectCylinderSet } from './divingCylinderSet';
 import { getUserWithId } from './user';
 import { errorHandler } from '../utils/errorHandler';
@@ -104,12 +106,17 @@ export const createFillEvent = async (
     gasMixture,
     filledAir,
     storageCylinderUsageArr,
+    diluentCylinderUsageArr = [],
     description,
     price,
     compressorId,
   } = body;
 
-  if (!filledAir && storageCylinderUsageArr.length === 0) {
+  if (
+    !filledAir &&
+    storageCylinderUsageArr.length === 0 &&
+    diluentCylinderUsageArr.length === 0
+  ) {
     return errorHandler(reply, 400, 'No gases were given');
   }
 
@@ -123,7 +130,8 @@ export const createFillEvent = async (
 
       if (
         !(user.isBlender || user.isAdvancedBlender || user.isAdmin) &&
-        storageCylinderUsageArr.length !== 0
+        (storageCylinderUsageArr.length !== 0 ||
+          diluentCylinderUsageArr.length !== 0)
       ) {
         throw new Error('No blender privileges');
       }
@@ -171,6 +179,46 @@ export const createFillEvent = async (
         }),
       );
 
+      await Promise.all(
+        diluentCylinderUsageArr.map(async (dcu): Promise<void> => {
+          if (dcu.startPressure < dcu.endPressure) {
+            throw new Error('Negative fill pressure');
+          }
+          if (dcu.oxygenPercentage + dcu.heliumPercentage > 100) {
+            throw new Error('Oxygen and helium percentages must not exceed 100');
+          }
+          const storageCylinder = await getStorageCylinderWithGasName(
+            String(dcu.storageCylinderId),
+            trx,
+          );
+          if (!storageCylinder) throw new Error('Storage cylinder not found');
+          if (storageCylinder.gasName !== 'Diluent')
+            throw new Error('Storage cylinder is not a diluent cylinder');
+
+          const volumeLitres =
+            Math.ceil(dcu.startPressure - dcu.endPressure) *
+            storageCylinder.volume;
+
+          const serverPrice = await getDiluentPrice(
+            String(dcu.storageCylinderId),
+            dcu.oxygenPercentage,
+            dcu.heliumPercentage,
+            trx,
+          );
+
+          await trx('fill_event_diluent_fill').insert({
+            fill_event_id: id,
+            storage_cylinder_id: dcu.storageCylinderId,
+            volume_litres: volumeLitres,
+            oxygen_percentage: dcu.oxygenPercentage,
+            helium_percentage: dcu.heliumPercentage,
+            oxygen_gas_price_id: serverPrice.oxygenGasPriceId,
+            helium_gas_price_id: serverPrice.heliumGasPriceId,
+            price_eur_cents: serverPrice.pricePerLitreCents * volumeLitres,
+          });
+        }),
+      );
+
       // Check that the price advertised to the user is correct
       const totalCost = await calcTotalCost(trx, id);
       if (totalCost !== price) throw new Error('Price mismatch');
@@ -198,6 +246,10 @@ export const createFillEvent = async (
         return errorHandler(reply, 500);
       case 'Gas id was not found for air':
         return errorHandler(reply, 500);
+      case 'Storage cylinder is not a diluent cylinder':
+        return errorHandler(reply, 400, 'Storage cylinder is not a diluent cylinder');
+      case 'Oxygen and helium percentages must not exceed 100':
+        return errorHandler(reply, 400, 'Oxygen and helium percentages must not exceed 100');
       case 'Negative fill pressure':
         return errorHandler(reply, 400, 'Cannot have negative fill pressure');
       case 'Price mismatch':
@@ -231,7 +283,7 @@ export const calcTotalCost = async (
     JSON.parse(JSON.stringify(fill)),
   ) as FillEventGasFill[];
 
-  const pricesPerGas: number[] = await Promise.all(
+  const gasFillCosts: number[] = await Promise.all(
     fillArr.map(async (fill): Promise<number> => {
       if (fill.storageCylinderId === null) {
         // compressed air
@@ -245,5 +297,15 @@ export const calcTotalCost = async (
     }),
   );
 
-  return pricesPerGas.reduce((acc, curValue) => acc + curValue, 0);
+  const diluentRes = await trx.raw<Array<Array<{ total: number }>>>(
+    `SELECT COALESCE(SUM(price_eur_cents), 0) AS total
+     FROM fill_event_diluent_fill
+     WHERE fill_event_id = :id`,
+    { id },
+  );
+  const diluentTotal: number = diluentRes[0][0].total;
+
+  return Math.ceil(
+    gasFillCosts.reduce((acc, curValue) => acc + curValue, 0) + diluentTotal
+  );
 };

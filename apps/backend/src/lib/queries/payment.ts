@@ -26,7 +26,7 @@ export const getUnpaidFillEvents = async (
     >
   >(
     `
-    WITH fill_event_price AS (
+    WITH gas_fill_price AS (
       SELECT
         fe.id AS fill_event_id,
         SUM(fegf.volume_litres * gp.price_eur_cents) AS price
@@ -36,6 +36,21 @@ export const getUnpaidFillEvents = async (
       WHERE
         fegf.storage_cylinder_id IS NOT NULL
       GROUP BY fe.id
+    ),
+    diluent_fill_price AS (
+      SELECT
+        fill_event_id,
+        COALESCE(SUM(price_eur_cents), 0) AS price
+      FROM fill_event_diluent_fill
+      GROUP BY fill_event_id
+    ),
+    fill_event_price AS (
+      SELECT
+        fe.id AS fill_event_id,
+        COALESCE(gfp.price, 0) + COALESCE(dfp.price, 0) AS price
+      FROM fill_event fe
+      LEFT JOIN gas_fill_price gfp ON gfp.fill_event_id = fe.id
+      LEFT JOIN diluent_fill_price dfp ON dfp.fill_event_id = fe.id
     )
     SELECT DISTINCT
       fe.id AS fill_event_id,
@@ -44,20 +59,14 @@ export const getUnpaidFillEvents = async (
       fe.gas_mixture AS fill_event_gas_mixture,
       fep.price
     FROM fill_event fe
-    JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
+    LEFT JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
     JOIN fill_event_price fep ON fep.fill_event_id = fe.id
     LEFT JOIN fill_event_payment_event fepe ON fepe.fill_event_id = fe.id
     LEFT JOIN payment_event pe ON pe.id = fepe.payment_event_id
     WHERE
-      -- Filter out air fills since they don't have storage cylinders
-      -- (and air is free)
-      fegf.storage_cylinder_id IS NOT NULL AND 
       fep.price > 0 AND
       fe.user_id = ? AND 
       (
-        -- Filter out fill events which have been paid already. Aka if
-        -- fill event already has completed payment event linked to it,
-        -- ignore the row
         NOT EXISTS (
           SELECT
             fepe2.fill_event_id
@@ -68,8 +77,6 @@ export const getUnpaidFillEvents = async (
           WHERE
             fepe2.fill_event_id = fe.id
         ) 
-        -- If there are no payment events linked or the status is FAILED,
-        -- fill event is considered unpaid and we should return the row
         AND (
           fepe.fill_event_id IS NULL OR
           pe.status = "FAILED"
@@ -102,7 +109,12 @@ export const calculateFillEventTotalPrice = async (
   >(
     `
     SELECT
-      SUM(fegf.volume_litres * gp.price_eur_cents) AS totalPrice
+      COALESCE(SUM(fegf.volume_litres * gp.price_eur_cents), 0) +
+      COALESCE((
+        SELECT SUM(price_eur_cents)
+        FROM fill_event_diluent_fill
+        WHERE fill_event_id IN (${fillEventIds.map(() => '?').join(',')})
+      ), 0) AS totalPrice
     FROM fill_event fe
     JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
     JOIN gas_price gp ON gp.id = fegf.gas_price_id
@@ -110,7 +122,7 @@ export const calculateFillEventTotalPrice = async (
       fe.id IN (${fillEventIds.map(() => '?').join(',')}) AND
       fegf.storage_cylinder_id IS NOT NULL
   `,
-    [...fillEventIds],
+    [...fillEventIds, ...fillEventIds],
   );
 
   if (totalPrice?.[0]?.totalPrice === null) {

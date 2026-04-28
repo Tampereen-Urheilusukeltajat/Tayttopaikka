@@ -34,6 +34,8 @@ const handler = async (
   if (!gasExists) return errorHandler(reply, 400, 'Gas does not exist');
   if (gasExists.name === 'Air')
     return errorHandler(reply, 400, 'Air price cannot be changed');
+  if (gasExists.name === 'Diluent')
+    return errorHandler(reply, 400, 'Diluent price cannot be changed');
 
   const futurePrice = await getFuturePriceForGas(request.body.gasId);
   if (futurePrice)

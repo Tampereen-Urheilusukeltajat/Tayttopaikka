@@ -1,5 +1,8 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { storageCylinderUsage } from './storageCylinder.types';
+import {
+  diluentCylinderUsage,
+  storageCylinderUsage,
+} from './storageCylinder.types';
 
 export const fillEvent = Type.Object({
   id: Type.Integer({ minimum: 0 }),
@@ -17,6 +20,7 @@ export const createFillEventBody = Type.Object({
   gasMixture: Type.String({ maxLength: 124 }),
   filledAir: Type.Boolean(),
   storageCylinderUsageArr: Type.Array(storageCylinderUsage),
+  diluentCylinderUsageArr: Type.Optional(Type.Array(diluentCylinderUsage)),
   description: Type.Optional(Type.String({ maxLength: 1024 })),
   price: Type.Integer({ minimum: 0 }),
   compressorId: Type.Optional(Type.String({ format: 'uuid' })),

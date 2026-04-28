@@ -79,6 +79,20 @@ describe('Get invoices', () => {
       // Check that we have invoices with rows
       assert.ok(body.length > 0);
       assert.ok(body[0].invoiceRows.length > 0);
+
+      // Verify diluent fill costs are included in invoice totals.
+      // admin user: fe3 (He 500L×300 + O2 300×150) + fe4 (O2old 5000×100) + fe7 (diluent-only)
+      // fe3 gas = 150000+45000=195000
+      // fe4 = 500000, fe7 = 15000
+      // admin invoiceTotal = 195000 + 500000 + 15000 = 710000
+      const adminInvoice = body.find((i) => i.user.email === 'admin@test.com');
+      assert.ok(adminInvoice, 'admin invoice should exist');
+      assert.strictEqual(adminInvoice.invoiceTotal, 710000);
+
+      // user: fe5 (O2old 5000×100) = 500000, no diluent
+      const userInvoice = body.find((i) => i.user.email === 'user@test.com');
+      assert.ok(userInvoice, 'user invoice should exist');
+      assert.strictEqual(userInvoice.invoiceTotal, 500000);
     });
   });
 
