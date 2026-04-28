@@ -91,3 +91,9 @@ flyctl deploy --config infra/backend/fly.toml --dockerfile infra/backend/Dockerf
 
 - Frontend: [infra/ui/fly.toml](infra/ui/fly.toml)
 - Backend: [infra/backend/fly.toml](infra/backend/fly.toml)
+
+## License
+
+This project is licensed under the GNU AFFERO GENERAL PUBLIC LICENSE — see the LICENSE file for details.
+
+In the past, the project used the MIT license and the code built during that time remains licensed as such. From now on, the new license applies to all new code and refactored parts of the software.
