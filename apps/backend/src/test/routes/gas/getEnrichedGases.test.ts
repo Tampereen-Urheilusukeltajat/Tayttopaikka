@@ -70,7 +70,7 @@ describe('Get enriched gases', () => {
 
       delete body[0].activeFrom;
 
-      assert.strictEqual(body[0].gasId, '1');
+      assert.strictEqual(body[0].gasId, 1);
       assert.strictEqual(body[0].gasName, 'Air');
       assert.strictEqual(body[0].priceEurCents, 0);
     });

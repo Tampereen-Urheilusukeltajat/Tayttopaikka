@@ -93,7 +93,7 @@ describe('Create gas price', () => {
       assert.deepStrictEqual(res.statusCode, 201);
       const body: GasWithPricing = JSON.parse(res.body);
 
-      assert.strictEqual(body.gasId, '3');
+      assert.strictEqual(body.gasId, 3);
       assert.strictEqual(body.gasName, 'Oxygen');
       assert.strictEqual(body.priceEurCents, 4);
       assert.ok(body.gasPriceId);
@@ -126,7 +126,7 @@ describe('Create gas price', () => {
       assert.deepStrictEqual(res.statusCode, 201);
       const body: GasWithPricing = JSON.parse(res.body);
 
-      assert.strictEqual(body.gasId, '2');
+      assert.strictEqual(body.gasId, 2);
       assert.strictEqual(body.gasName, 'Helium');
       assert.strictEqual(body.priceEurCents, 7);
       assert.ok(body.gasPriceId);

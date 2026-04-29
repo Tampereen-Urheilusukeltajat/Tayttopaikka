@@ -90,7 +90,7 @@ describe('Create storage cylinder', () => {
       assert.deepStrictEqual(res.statusCode, 201);
       const body: StorageCylinder = JSON.parse(res.body);
 
-      assert.strictEqual(body.gasId, '1');
+      assert.strictEqual(body.gasId, 1);
       assert.strictEqual(body.maxPressure, 200);
       assert.strictEqual(body.volume, 50);
       assert.ok(body.id);

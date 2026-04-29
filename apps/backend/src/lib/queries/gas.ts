@@ -314,7 +314,7 @@ export const getDiluentPrice = async (
 
   return {
     pricePerLitreCents,
-    oxygenGasPriceId: String(oxygenPrice.gasPriceId),
-    heliumGasPriceId: String(heliumPrice.gasPriceId),
+    oxygenGasPriceId: oxygenPrice.gasPriceId,
+    heliumGasPriceId: heliumPrice.gasPriceId,
   };
 };

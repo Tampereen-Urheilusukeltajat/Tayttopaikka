@@ -16,8 +16,8 @@ export type Gas = Static<typeof gas>;
 export const gasWithPricing = Type.Object({
   activeFrom: Type.String({ format: 'date-time' }),
   activeTo: Type.Optional(Type.String({ format: 'date-time' })),
-  gasId: Type.String(),
-  gasPriceId: Type.String(),
+  gasId: Type.Integer(),
+  gasPriceId: Type.Integer(),
   gasName: Type.String(),
   priceEurCents: Type.Number({ minimum: 0 }),
 });
@@ -56,6 +56,6 @@ export type DiluentPriceResponse = Static<typeof diluentPriceResponse>;
 // Internal type returned by getDiluentPrice — includes audit IDs for DB storage
 // but not exposed on the API.
 export type DiluentPriceResult = DiluentPriceResponse & {
-  oxygenGasPriceId: string;
-  heliumGasPriceId: string;
+  oxygenGasPriceId: number;
+  heliumGasPriceId: number;
 };

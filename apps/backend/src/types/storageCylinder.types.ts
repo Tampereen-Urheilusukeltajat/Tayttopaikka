@@ -30,8 +30,8 @@ export type CreateStorageCylinderBody = Static<
 >;
 
 export const storageCylinder = Type.Intersect([
-  Type.Object({ id: Type.String() }),
-  createStorageCylinderBody,
+  Type.Object({ id: Type.String(), gasId: Type.Integer() }),
+  Type.Omit(createStorageCylinderBody, ['gasId']),
 ]);
 
 export type StorageCylinder = Static<typeof storageCylinder>;

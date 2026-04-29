@@ -18,7 +18,7 @@ import { type FastifyReply } from 'fastify';
 
 const getActivePriceId = async (
   trx: Knex.Transaction,
-  gasId: string,
+  gasId: number,
 ): Promise<number> => {
   const prices: GasPrice[] = await trx<GasPrice>('gas_price')
     .where('gas_id', gasId)
@@ -39,7 +39,7 @@ const getActivePriceId = async (
   return pricesArr[0].id;
 };
 
-const getAirGasId = async (trx: Knex.Transaction): Promise<string> => {
+const getAirGasId = async (trx: Knex.Transaction): Promise<number> => {
   const air = await trx<Gas>('gas').where('name', 'Air').first('id');
 
   if (air === undefined) {
@@ -47,7 +47,7 @@ const getAirGasId = async (trx: Knex.Transaction): Promise<string> => {
     throw new Error('Gas id was not found for air');
   }
 
-  return air.id;
+  return Number(air.id);
 };
 
 export const getFillEvents = async (
