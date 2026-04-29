@@ -39,23 +39,9 @@ export const gasPrice = Type.Intersect([
 
 export type GasPrice = Static<typeof gasPrice>;
 
-export const diluentPriceQuery = Type.Object({
-  storageCylinderId: Type.String(),
-  oxygenPercentage: Type.Number({ minimum: 0, maximum: 100 }),
-  heliumPercentage: Type.Number({ minimum: 0, maximum: 100 }),
-});
-
-export type DiluentPriceQuery = Static<typeof diluentPriceQuery>;
-
-export const diluentPriceResponse = Type.Object({
-  pricePerLitreCents: Type.Number({ minimum: 0 }),
-});
-
-export type DiluentPriceResponse = Static<typeof diluentPriceResponse>;
-
-// Internal type returned by getDiluentPrice — includes audit IDs for DB storage
-// but not exposed on the API.
-export type DiluentPriceResult = DiluentPriceResponse & {
+// Internal type used by getDiluentPrice query for DB storage
+export type DiluentPriceResult = {
+  pricePerLitreCents: number;
   oxygenGasPriceId: number;
   heliumGasPriceId: number;
 };

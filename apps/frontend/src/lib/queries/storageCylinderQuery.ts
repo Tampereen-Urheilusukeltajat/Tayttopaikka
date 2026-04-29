@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 
 export type StorageCylinder = {
   id: string;
-  gasId: string;
+  gasId: number;
   name: string;
   maxPressure: number;
   volume: number;

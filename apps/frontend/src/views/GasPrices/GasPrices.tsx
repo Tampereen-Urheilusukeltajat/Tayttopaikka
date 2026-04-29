@@ -30,7 +30,7 @@ const buildTableRows = (prices: GasWithPricing[]): PriceRow[] => {
     p.activeTo !== undefined && new Date(p.activeTo) <= now;
   const isCurrent = (p: GasWithPricing): boolean => !isFuture(p) && !isPast(p);
 
-  const byGas = prices.reduce<Map<string, GasWithPricing[]>>((acc, price) => {
+  const byGas = prices.reduce<Map<number, GasWithPricing[]>>((acc, price) => {
     acc.set(price.gasId, [...(acc.get(price.gasId) ?? []), price]);
     return acc;
   }, new Map());
@@ -38,6 +38,9 @@ const buildTableRows = (prices: GasWithPricing[]): PriceRow[] => {
   return Array.from(byGas.values()).flatMap((group) => {
     const current = group.find(isCurrent);
     if (!current) return [];
+    // Diluent pricing is calculated when users input the current oxygen and helium percentages
+    // at the filling event
+    if (current.gasName === 'Diluent') return [];
 
     const future = group.find(isFuture); // at most one per spec
     const past = group.filter(isPast);

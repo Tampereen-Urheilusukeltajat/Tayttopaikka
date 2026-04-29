@@ -2,7 +2,7 @@ import { type GasWithPricing } from '../queries/gasQuery';
 import { authGetAsync, authPostAsync, authDeleteAsync } from './api';
 
 export type CreateGasPricePayload = {
-  gasId: string;
+  gasId: number;
   priceEurCents: number;
   activeFrom: string;
 };
