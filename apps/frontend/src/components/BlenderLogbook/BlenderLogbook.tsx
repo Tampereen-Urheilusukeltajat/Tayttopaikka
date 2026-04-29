@@ -230,7 +230,7 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
                 errors={errors}
                 values={values}
               />
-              <PricingTile errors={errors} gases={gases} values={values} />
+              <PricingTile errors={errors} gases={gases.filter((g) => g.gasName !== AvailableGasses.diluent)} values={values} />
             </div>
 
             <FillingTile
