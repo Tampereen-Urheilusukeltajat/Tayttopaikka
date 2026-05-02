@@ -43,12 +43,14 @@ export const handlePasswordSetRequest = async (
   await redisClient.DEL(key);
 
   // invalidate old refresh token sessions
-  for await (const key of redisClient.scanIterator({
+  for await (const keys of redisClient.scanIterator({
     TYPE: 'string',
     MATCH: `${userInfo.id}:*`,
     COUNT: 100,
   })) {
-    await redisClient.DEL(key);
+    if (keys.length > 0) {
+      await redisClient.DEL(keys);
+    }
   }
 
   const newPasswordHashed = await hashPassword(body.password);
