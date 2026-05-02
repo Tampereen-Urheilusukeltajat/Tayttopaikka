@@ -201,7 +201,6 @@ export const createFillEvent = async (
 
           const serverPrice = await getDiluentPrice(
             String(dcu.storageCylinderId),
-            dcu.oxygenPercentage,
             dcu.heliumPercentage,
             trx,
           );
@@ -212,7 +211,7 @@ export const createFillEvent = async (
             volume_litres: volumeLitres,
             oxygen_percentage: dcu.oxygenPercentage,
             helium_percentage: dcu.heliumPercentage,
-            oxygen_gas_price_id: serverPrice.oxygenGasPriceId,
+            oxygen_gas_price_id: null,
             helium_gas_price_id: serverPrice.heliumGasPriceId,
             price_eur_cents: serverPrice.pricePerLitreCents * volumeLitres,
           });

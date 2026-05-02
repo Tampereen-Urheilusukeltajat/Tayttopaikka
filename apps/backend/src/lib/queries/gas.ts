@@ -283,15 +283,14 @@ export const deleteFutureGasPrice = async (
 };
 
 /**
- * Returns the current per-litre price for a diluent fill based on O2/He composition.
- * Looks up the active Oxygen and Helium prices from the DB.
+ * Returns the current per-litre price for a diluent fill based on He composition.
+ * Oxygen is not charged for diluent fills — only helium is billed.
  *
  * Formula:
- *   pricePerLitre = (oxygenPct/100 * oxygenPrice) + (heliumPct/100 * heliumPrice)
+ *   pricePerLitre = (heliumPct/100 * heliumPrice)
  */
 export const getDiluentPrice = async (
   storageCylinderId: string,
-  oxygenPercentage: number,
   heliumPercentage: number,
   trx?: Knex.Transaction,
 ): Promise<DiluentPriceResult> => {
@@ -300,21 +299,13 @@ export const getDiluentPrice = async (
   if (cylinder.gasName !== 'Diluent')
     throw new Error('Storage cylinder is not a diluent cylinder');
 
-  const [oxygenPrice, heliumPrice] = await Promise.all([
-    getActiveGasPriceForGas('Oxygen', trx),
-    getActiveGasPriceForGas('Helium', trx),
-  ]);
-
-  if (!oxygenPrice) throw new Error('No active price found for Oxygen');
+  const heliumPrice = await getActiveGasPriceForGas('Helium', trx);
   if (!heliumPrice) throw new Error('No active price found for Helium');
 
-  const pricePerLitreCents =
-    (oxygenPercentage / 100) * oxygenPrice.priceEurCents +
-    (heliumPercentage / 100) * heliumPrice.priceEurCents;
+  const pricePerLitreCents = (heliumPercentage / 100) * heliumPrice.priceEurCents;
 
   return {
     pricePerLitreCents,
-    oxygenGasPriceId: oxygenPrice.gasPriceId,
     heliumGasPriceId: heliumPrice.gasPriceId,
   };
 };

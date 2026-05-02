@@ -112,7 +112,7 @@ describe('Invoice e2e flow', () => {
 
   // Helper: create a diluent fill
   // sc11 = Diluent 50L, 20% O2 + 40% He, start=10, end=8 → 100L
-  // price = ceil((0.20*0.6 + 0.40*6) * 100) = ceil(252) = 252 cents
+  // price = ceil(0.40*6 * 100) = ceil(240) = 240 cents (O2 not charged)
   const createDiluentFill = async (
     srv: FastifyInstance,
     headers: { Authorization: string },
@@ -134,7 +134,7 @@ describe('Invoice e2e flow', () => {
             heliumPercentage: 40,
           },
         ],
-        price: 252,
+        price: 240,
       },
       headers,
     });
@@ -162,8 +162,8 @@ describe('Invoice e2e flow', () => {
     const ids1 = invoice1.invoiceRows.map((r) => r.id);
     assert.ok(ids1.includes(gasFillId), 'gas fill should appear in invoice');
     assert.ok(ids1.includes(diluentFillId), 'diluent fill should appear in invoice');
-    // 60 (gas O2) + 252 (diluent) = 312
-    assert.strictEqual(invoice1.invoiceTotal, 312);
+    // 60 (gas O2) + 240 (diluent) = 300
+    assert.strictEqual(invoice1.invoiceTotal, 300);
 
     // --- Step 3: pay the invoice ---
     const payRes = await server.inject({
@@ -217,7 +217,7 @@ describe('Invoice e2e flow', () => {
 
     const invoices = JSON.parse(invoiceRes.body) as Invoice[];
     assert.strictEqual(invoices.length, 1);
-    assert.strictEqual(invoices[0].invoiceTotal, 252);
+    assert.strictEqual(invoices[0].invoiceTotal, 240);
     assert.ok(invoices[0].invoiceRows.map((r) => r.id).includes(diluentFillId));
   });
 });

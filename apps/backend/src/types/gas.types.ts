@@ -42,6 +42,5 @@ export type GasPrice = Static<typeof gasPrice>;
 // Internal type used by getDiluentPrice query for DB storage
 export type DiluentPriceResult = {
   pricePerLitreCents: number;
-  oxygenGasPriceId: number;
   heliumGasPriceId: number;
 };

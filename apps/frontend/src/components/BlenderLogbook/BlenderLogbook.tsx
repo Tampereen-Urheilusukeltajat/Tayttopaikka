@@ -146,11 +146,10 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
       const gasFillTotal = values.fillingEventRows
         .map((row) => row.priceEurCents)
         .reduce((sum, price) => sum + price, 0);
-      const o2PriceCents = gases.find((g) => g.gasName === AvailableGasses.oxygen)?.priceEurCents ?? 0;
       const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
       const diluentFillTotal = values.diluentFillingRows.reduce((sum, row) => {
         const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
-        return sum + calcDiluentRowPriceEur(row, cyl, o2PriceCents, hePriceCents);
+        return sum + calcDiluentRowPriceEur(row, cyl, hePriceCents);
       }, 0);
       const totalPriceEurCents = formatEurToEurCents(gasFillTotal + diluentFillTotal);
 
@@ -255,11 +254,10 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
                   .map((row) => row.priceEurCents)
                   .reduce((sum, price) => sum + price, 0) +
                 (() => {
-                  const o2P = gases.find((g) => g.gasName === AvailableGasses.oxygen)?.priceEurCents ?? 0;
                   const heP = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
                   return values.diluentFillingRows.reduce((sum, row) => {
                     const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
-                    return sum + calcDiluentRowPriceEur(row, cyl, o2P, heP);
+                    return sum + calcDiluentRowPriceEur(row, cyl, heP);
                   }, 0);
                 })()
               }

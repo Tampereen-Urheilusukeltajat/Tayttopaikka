@@ -322,7 +322,7 @@ describe('create fill event', () => {
 
   describe('diluent fills', () => {
     // sc11: Diluent, 50L volume (gas_id=5)
-    // Helium 300 cents/L, Oxygen 150 cents/L
+    // Helium 300 cents/L (oxygen is not charged for diluent fills)
     const DILUENT_SC_ID = 11;
     const CYLINDER_SET_ID = 'b4e1035e-f36e-4056-9a1b-5925a3c5793e';
 
@@ -335,7 +335,7 @@ describe('create fill event', () => {
     test('creates a fill event with a diluent cylinder', async () => {
       // 20% O2, 40% He, start=10, end=8
       // vol = ceil(10-8) * 50 = 100L
-      // price = (0.20*150 + 0.40*300) * 100 = 15000 cents
+      // price = (0.40*300) * 100 = 12000 cents (O2 not charged)
       const PAYLOAD = {
         cylinderSetId: CYLINDER_SET_ID,
         gasMixture: 'TMX 20/40',
@@ -350,7 +350,7 @@ describe('create fill event', () => {
             heliumPercentage: 40,
           },
         ],
-        price: 15000,
+        price: 12000,
       };
       const res = await server.inject({
         url: 'api/fill-event',
@@ -360,7 +360,7 @@ describe('create fill event', () => {
       });
       assert.strictEqual(res.statusCode, 201);
       const body = JSON.parse(res.body);
-      assert.strictEqual(body.price, 15000);
+      assert.strictEqual(body.price, 12000);
 
       const diluentFills = await getTestKnex()('fill_event_diluent_fill')
         .where('fill_event_id', body.id)
@@ -369,7 +369,7 @@ describe('create fill event', () => {
       assert.strictEqual(diluentFills[0].storage_cylinder_id, DILUENT_SC_ID);
       assert.strictEqual(diluentFills[0].oxygen_percentage, 20);
       assert.strictEqual(diluentFills[0].helium_percentage, 40);
-      assert.strictEqual(diluentFills[0].price_eur_cents, 15000);
+      assert.strictEqual(diluentFills[0].price_eur_cents, 12000);
     });
 
     test('fails when using a non-diluent cylinder in diluentCylinderUsageArr', async () => {
@@ -460,7 +460,7 @@ describe('create fill event', () => {
     });
 
     test('creates a fill event with 100% oxygen and 0% helium', async () => {
-      // vol = ceil(10-8) * 50 = 100L, price = 1.0*150 * 100 = 15000 cents
+      // vol = ceil(10-8) * 50 = 100L, price = 0 (only helium is charged, He=0%)
       const PAYLOAD = {
         cylinderSetId: CYLINDER_SET_ID,
         gasMixture: 'Oxygen 100%',
@@ -475,7 +475,7 @@ describe('create fill event', () => {
             heliumPercentage: 0,
           },
         ],
-        price: 15000,
+        price: 0,
       };
       const res = await server.inject({
         url: 'api/fill-event',
@@ -484,7 +484,7 @@ describe('create fill event', () => {
         headers,
       });
       assert.strictEqual(res.statusCode, 201);
-      assert.strictEqual(JSON.parse(res.body).price, 15000);
+      assert.strictEqual(JSON.parse(res.body).price, 0);
     });
 
     test('creates a fill event with 0% oxygen and 100% helium', async () => {

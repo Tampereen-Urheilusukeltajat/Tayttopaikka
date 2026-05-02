@@ -29,16 +29,12 @@ type DiluentRow = {
 export const calcDiluentRowPriceEur = (
   row: DiluentRow,
   cylinder: StorageCylinder | undefined,
-  o2PriceCents: number,
   hePriceCents: number,
 ): number => {
   if (!cylinder) return 0;
   const totalVolumeLitres = Math.ceil(row.startPressure - row.endPressure) * cylinder.volume;
-  const o2Pct = Number(row.oxygenPercentage);
   const hePct = Number(row.heliumPercentage);
-  const totalCents = Math.ceil(
-    ((o2Pct / 100) * o2PriceCents + (hePct / 100) * hePriceCents) * totalVolumeLitres,
-  );
+  const totalCents = Math.ceil((hePct / 100) * hePriceCents * totalVolumeLitres);
   return formatEurCentsToEur(totalCents);
 };
 
@@ -71,19 +67,15 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
 }) => {
   const row = values.diluentFillingRows.at(index);
   const cylinder = diluentCylinders.find((sc) => sc.id === row?.storageCylinderId);
-  const o2PriceCents = gases.find((g) => g.gasName === AvailableGasses.oxygen)?.priceEurCents ?? 0;
   const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
 
   const totalVolumeLitres =
     cylinder && row ? Math.ceil(row.startPressure - row.endPressure) * cylinder.volume : 0;
 
-  const o2Pct = Number(row?.oxygenPercentage ?? 0);
   const hePct = Number(row?.heliumPercentage ?? 0);
-
-  const o2VolumeLitres = (o2Pct / 100) * totalVolumeLitres;
   const heVolumeLitres = (hePct / 100) * totalVolumeLitres;
 
-  const priceEur = row ? calcDiluentRowPriceEur(row, cylinder, o2PriceCents, hePriceCents) : 0;
+  const priceEur = row ? calcDiluentRowPriceEur(row, cylinder, hePriceCents) : 0;
 
   return (
     <div className={styles.fillingRow}>
@@ -143,7 +135,6 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
         errorText={errors.diluentFillingRows?.at(index)?.endPressure}
       />
       <ReadOnlyField label="Kulutus" value={totalVolumeLitres} unit="l" />
-      <ReadOnlyField label="Happitilavuus" value={o2VolumeLitres} unit="l" />
       <ReadOnlyField label="Heliumtilavuus" value={heVolumeLitres} unit="l" />
       <ReadOnlyField label="Hinta" value={priceEur} unit="€" />
     </div>
@@ -183,17 +174,20 @@ export const DiluentFillingTile: React.FC<DiluentFillingTileProps> = ({
               <Popover.Header>Hinnan laskenta</Popover.Header>
               <Popover.Body>
                 <p className="mb-2">
-                  <strong>Täyttö:</strong> Valitse varastopullo (jos useampi kuin yksi), syötä sen kaasun koostumus
+                  <strong>Täyttö:</strong> Valitse varastopullo, syötä sen kaasun koostumus
                   (O₂% ja He%) sekä varastopullon paine ennen ja jälkeen täytön.
                   Hinta lasketaan automaattisesti.
                 </p>
                 <hr className="my-2" />
                 <p className="mb-1">
                   <strong>Kaava:</strong>{' '}
-                  <code>⌈(O2% × O2-hinta + He% × He-hinta) × kulutus⌉</code>
+                  <code>⌈He% × He-hinta × kulutus⌉</code>
                 </p>
                 <p className="mb-1">
                   <strong>Kulutus</strong> = (lähtöpaine − loppupaine) × varastopullon tilavuus
+                </p>
+                <p className="mb-1 text-muted" style={{ fontSize: '0.85em' }}>
+                  Happea ei veloiteta — hinta perustuu vain heliumiin.
                 </p>
                 <hr className="my-2" />
                 <p className="mb-1">
@@ -201,7 +195,7 @@ export const DiluentFillingTile: React.FC<DiluentFillingTileProps> = ({
                 </p>
                 <p className="mb-1">Kulutus: (200−195) × 50 = 250 l</p>
                 <p className="mb-0">
-                  ⌈(0,21 × 5 snt + 0,35 × 12 snt) × 250⌉ = ⌈1312,5⌉ = <strong>1313 snt = 13,13 €</strong>
+                  ⌈0,35 × 12 snt × 250⌉ = ⌈1050⌉ = <strong>1050 snt = 10,50 €</strong>
                 </p>
               </Popover.Body>
             </Popover>
