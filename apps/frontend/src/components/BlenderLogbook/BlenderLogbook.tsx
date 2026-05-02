@@ -8,8 +8,13 @@ import { Form, Formik, type FormikHelpers } from 'formik';
 import { BasicInfoTile } from './components/BasicInfoTile';
 import { PricingTile } from './components/PricingTile';
 import { FillingTile } from './components/FillingTile';
+import {
+  DiluentFillingTile,
+  calcDiluentRowPriceEur,
+} from './components/DiluentFillingTile';
 import { SavingTile } from './components/SavingTile';
 import {
+  AvailableGasses,
   AvailableMixtureCompositions,
   AvailableMixtures,
   formalizeGasMixture,
@@ -18,6 +23,7 @@ import {
 import { BLENDER_FILLING_EVENT_VALIDATION_SCHEMA } from './validation';
 import { useMutation } from '@tanstack/react-query';
 import {
+  type DiluentCylinderUsage,
   type NewFillEvent,
   type StorageCylinderUsage,
 } from '../../interfaces/FillEvent';
@@ -51,7 +57,17 @@ type FillingEventRow = {
   uniqueId: string;
 };
 
+type DiluentFillingRow = {
+  endPressure: number;
+  heliumPercentage: string;
+  oxygenPercentage: string;
+  startPressure: number;
+  storageCylinderId: string;
+  uniqueId: string;
+};
+
 type FormFields = FillingEventBasicInfo & {
+  diluentFillingRows: DiluentFillingRow[];
   fillingEventRows: FillingEventRow[];
 };
 
@@ -75,6 +91,23 @@ export const emptyFillingRow = (startPressure = 0): FillingEventRow => ({
   uniqueId: crypto.randomUUID(),
 });
 
+export const emptyDiluentFillingRow = (
+  diluentCylinders: StorageCylinder[],
+  existingRows: DiluentFillingRow[],
+): DiluentFillingRow => {
+  // Auto-select the first cylinder not already in use
+  const usedIds = new Set(existingRows.map((r) => r.storageCylinderId));
+  const available = diluentCylinders.find((sc) => !usedIds.has(sc.id));
+  return {
+    endPressure: 0,
+    heliumPercentage: '',
+    oxygenPercentage: '',
+    startPressure: 0,
+    storageCylinderId: available?.id ?? diluentCylinders[0]?.id ?? '',
+    uniqueId: crypto.randomUUID(),
+  };
+};
+
 export type CommonTileProps = {
   // TODO FIX THIS
   // Casting as any because array errors wouldn't be otherwise correctly typed
@@ -90,6 +123,9 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
   gases,
   storageCylinders,
 }) => {
+  const diluentGasId = gases.find((g) => g.gasName === AvailableGasses.diluent)?.gasId;
+  const diluentCylinders = storageCylinders.filter((sc) => sc.gasId === diluentGasId);
+  const regularStorageCylinders = storageCylinders.filter((sc) => sc.gasId !== diluentGasId);
   const fillEventMutation = useMutation({
     mutationFn: async (payload: NewFillEvent) => postFillEvent(payload),
     onError: () => {
@@ -107,11 +143,15 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
         values.heliumPercentage,
       );
 
-      const totalPriceEurCents = formatEurToEurCents(
-        values.fillingEventRows
-          .map((row) => row.priceEurCents)
-          .reduce((partialSum, price) => partialSum + price, 0),
-      );
+      const gasFillTotal = values.fillingEventRows
+        .map((row) => row.priceEurCents)
+        .reduce((sum, price) => sum + price, 0);
+      const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+      const diluentFillTotal = values.diluentFillingRows.reduce((sum, row) => {
+        const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
+        return sum + calcDiluentRowPriceEur(row, cyl, hePriceCents);
+      }, 0);
+      const totalPriceEurCents = formatEurToEurCents(gasFillTotal + diluentFillTotal);
 
       // Allow user to do pure air fills via Happihäkki page
       const filledAir =
@@ -131,6 +171,16 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
               endPressure: row.endPressure,
               startPressure: row.startPressure,
             })),
+          diluentCylinderUsageArr:
+            values.diluentFillingRows.length > 0
+              ? values.diluentFillingRows.map<DiluentCylinderUsage>((row) => ({
+                  storageCylinderId: Number(row.storageCylinderId),
+                  endPressure: row.endPressure,
+                  startPressure: row.startPressure,
+                  oxygenPercentage: Number(row.oxygenPercentage),
+                  heliumPercentage: Number(row.heliumPercentage),
+                }))
+              : undefined,
           compressorId: values.compressorId ? values.compressorId : undefined,
         },
         {
@@ -144,7 +194,7 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
         },
       );
     },
-    [fillEventMutation],
+    [diluentCylinders, fillEventMutation, gases],
   );
 
   return (
@@ -156,13 +206,14 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
           ...EMPTY_FILLING_EVENT_BASIC_INFO,
           divingCylinderSetId: divingCylinderSets[0]?.id ?? '',
           compressorId: compressors[0].id ?? '',
+          diluentFillingRows: [] as DiluentFillingRow[],
           fillingEventRows: [
             {
               ...emptyFillingRow(),
-              storageCylinderId: storageCylinders[0]?.id ?? '',
+              storageCylinderId: regularStorageCylinders[0]?.id ?? '',
             },
           ],
-        }}
+        } satisfies FormFields}
         validateOnBlur={false}
         validateOnChange={false}
         validationSchema={BLENDER_FILLING_EVENT_VALIDATION_SCHEMA}
@@ -178,21 +229,38 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
                 errors={errors}
                 values={values}
               />
-              <PricingTile errors={errors} gases={gases} values={values} />
+              <PricingTile errors={errors} gases={gases.filter((g) => g.gasName !== AvailableGasses.diluent)} values={values} />
             </div>
 
             <FillingTile
               setFieldValue={setFieldValue}
               errors={errors}
               values={values}
-              storageCylinders={storageCylinders}
+              storageCylinders={regularStorageCylinders}
+              gases={gases}
+            />
+
+            <DiluentFillingTile
+              errors={errors}
+              values={values}
+              setFieldValue={setFieldValue}
+              diluentCylinders={diluentCylinders}
               gases={gases}
             />
 
             <SavingTile
-              totalPrice={values.fillingEventRows
-                .map((row) => row.priceEurCents)
-                .reduce((partialSum, price) => partialSum + price, 0)}
+              totalPrice={
+                values.fillingEventRows
+                  .map((row) => row.priceEurCents)
+                  .reduce((sum, price) => sum + price, 0) +
+                (() => {
+                  const heP = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+                  return values.diluentFillingRows.reduce((sum, row) => {
+                    const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
+                    return sum + calcDiluentRowPriceEur(row, cyl, heP);
+                  }, 0);
+                })()
+              }
               errors={errors}
               values={values}
               isSubmitting={isSubmitting}

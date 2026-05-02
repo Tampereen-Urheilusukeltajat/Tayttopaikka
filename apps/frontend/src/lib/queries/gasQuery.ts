@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 export type GasWithPricing = {
   activeFrom: string;
   activeTo?: string;
-  gasId: string;
+  gasId: number;
   gasName: AvailableGasses;
   gasPriceId: number;
   priceEurCents: number;

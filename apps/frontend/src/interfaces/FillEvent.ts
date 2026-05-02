@@ -17,6 +17,14 @@ export type StorageCylinderUsage = {
   endPressure: number;
 };
 
+export type DiluentCylinderUsage = {
+  storageCylinderId: number;
+  startPressure: number;
+  endPressure: number;
+  oxygenPercentage: number;
+  heliumPercentage: number;
+};
+
 export type NewFillEvent = {
   cylinderSetId: string;
   gasMixture: string;
@@ -24,6 +32,7 @@ export type NewFillEvent = {
   description: string;
   price: number;
   storageCylinderUsageArr: StorageCylinderUsage[];
+  diluentCylinderUsageArr?: DiluentCylinderUsage[];
   compressorId?: string;
 };
 

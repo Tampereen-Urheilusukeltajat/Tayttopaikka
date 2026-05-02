@@ -108,7 +108,9 @@ describe('create fill event', () => {
           },
         ],
         description: 'Tämä on jonkinlainen seos',
-        price: 0,
+        // sc1: Helium 50L, ceil(10-8)=2 bars, 2*50*300 = 30000 cents
+        // sc5: Oxygen 50L, ceil(13.5-10.2)=4 bars, 4*50*150 = 30000 cents
+        price: 60000,
       };
       const res = await server.inject({
         url: 'api/fill-event',
@@ -119,7 +121,7 @@ describe('create fill event', () => {
       const resBody = JSON.parse(res.body);
 
       // TODO Create more complex test
-      const expectedPrice = 0;
+      const expectedPrice = 60000;
       // const expectedPrice =
       //   (PAYLOAD.storageCylinderUsageArr[0].startPressure -
       //     PAYLOAD.storageCylinderUsageArr[0].endPressure) *
@@ -317,4 +319,257 @@ describe('create fill event', () => {
       assert.deepStrictEqual(res.statusCode, 403);
     });
   });
+
+  describe('diluent fills', () => {
+    // sc11: Diluent, 50L volume (gas_id=5)
+    // Helium 300 cents/L (oxygen is not charged for diluent fills)
+    const DILUENT_SC_ID = 11;
+    const CYLINDER_SET_ID = 'b4e1035e-f36e-4056-9a1b-5925a3c5793e';
+
+    afterEach(async () => {
+      await getTestKnex()('fill_event_diluent_fill').del();
+      await getTestKnex()('fill_event_gas_fill').del();
+      await getTestKnex()('fill_event').del();
+    });
+
+    test('creates a fill event with a diluent cylinder', async () => {
+      // 20% O2, 40% He, start=10, end=8
+      // vol = ceil(10-8) * 50 = 100L
+      // price = (0.40*300) * 100 = 12000 cents (O2 not charged)
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'TMX 20/40',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: DILUENT_SC_ID,
+            startPressure: 10,
+            endPressure: 8,
+            oxygenPercentage: 20,
+            heliumPercentage: 40,
+          },
+        ],
+        price: 12000,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 201);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.price, 12000);
+
+      const diluentFills = await getTestKnex()('fill_event_diluent_fill')
+        .where('fill_event_id', body.id)
+        .select();
+      assert.strictEqual(diluentFills.length, 1);
+      assert.strictEqual(diluentFills[0].storage_cylinder_id, DILUENT_SC_ID);
+      assert.strictEqual(diluentFills[0].oxygen_percentage, 20);
+      assert.strictEqual(diluentFills[0].helium_percentage, 40);
+      assert.strictEqual(diluentFills[0].price_eur_cents, 12000);
+    });
+
+    test('fails when using a non-diluent cylinder in diluentCylinderUsageArr', async () => {
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'TMX',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: 1, // Helium cylinder, not Diluent
+            startPressure: 10,
+            endPressure: 8,
+            oxygenPercentage: 20,
+            heliumPercentage: 40,
+          },
+        ],
+        price: 15000,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.message, 'Storage cylinder is not a diluent cylinder');
+    });
+
+    test('fails with negative fill pressure in diluentCylinderUsageArr', async () => {
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'TMX',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: DILUENT_SC_ID,
+            startPressure: 8,
+            endPressure: 10,
+            oxygenPercentage: 20,
+            heliumPercentage: 40,
+          },
+        ],
+        price: 0,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.message, 'Cannot have negative fill pressure');
+    });
+
+    test('fails when oxygen + helium percentages exceed 100', async () => {
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'TMX',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: DILUENT_SC_ID,
+            startPressure: 10,
+            endPressure: 8,
+            oxygenPercentage: 60,
+            heliumPercentage: 60,
+          },
+        ],
+        price: 0,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(
+        body.message,
+        'Oxygen and helium percentages must not exceed 100',
+      );
+    });
+
+    test('creates a fill event with 100% oxygen and 0% helium', async () => {
+      // vol = ceil(10-8) * 50 = 100L, price = 0 (only helium is charged, He=0%)
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'Oxygen 100%',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: DILUENT_SC_ID,
+            startPressure: 10,
+            endPressure: 8,
+            oxygenPercentage: 100,
+            heliumPercentage: 0,
+          },
+        ],
+        price: 0,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 201);
+      assert.strictEqual(JSON.parse(res.body).price, 0);
+    });
+
+    test('creates a fill event with 0% oxygen and 100% helium', async () => {
+      // vol = ceil(10-8) * 50 = 100L, price = 1.0*300 * 100 = 30000 cents
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'Helium 100%',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: DILUENT_SC_ID,
+            startPressure: 10,
+            endPressure: 8,
+            oxygenPercentage: 0,
+            heliumPercentage: 100,
+          },
+        ],
+        price: 30000,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 201);
+      assert.strictEqual(JSON.parse(res.body).price, 30000);
+    });
+
+    test('creates a fill event with 0% oxygen and 50% helium', async () => {
+      // vol = ceil(10-8) * 50 = 100L, price = 0.5*300 * 100 = 15000 cents
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'Helium 50%',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: DILUENT_SC_ID,
+            startPressure: 10,
+            endPressure: 8,
+            oxygenPercentage: 0,
+            heliumPercentage: 50,
+          },
+        ],
+        price: 15000,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 201);
+      assert.strictEqual(JSON.parse(res.body).price, 15000);
+    });
+
+    test('fails when client-submitted price does not match server-calculated price', async () => {
+      const PAYLOAD = {
+        cylinderSetId: CYLINDER_SET_ID,
+        gasMixture: 'TMX',
+        filledAir: false,
+        storageCylinderUsageArr: [],
+        diluentCylinderUsageArr: [
+          {
+            storageCylinderId: DILUENT_SC_ID,
+            startPressure: 10,
+            endPressure: 8,
+            oxygenPercentage: 20,
+            heliumPercentage: 40,
+          },
+        ],
+        price: 1, // wrong total
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: PAYLOAD,
+        headers,
+      });
+      assert.strictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.message, 'Client price did not match server price');
+    });
+  });
 });
+

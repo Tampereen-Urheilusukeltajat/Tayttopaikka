@@ -2,9 +2,11 @@ import { type Knex } from 'knex';
 import { knexController, withinTransaction } from '../../database/database';
 import {
   type CreateGasPriceBody,
+  type DiluentPriceResult,
   type Gas,
   type GasWithPricing,
 } from '../../types/gas.types';
+import { getStorageCylinderWithGasName } from './storageCylinder';
 import { convertDateToMariaDBDateTime } from '../utils/dateTime';
 
 const GAS_WITH_PRICING_COLUMNS = [
@@ -219,6 +221,31 @@ export const getFuturePriceForGas = async (
   return res[0][0];
 };
 
+export const getActiveGasPriceForGas = async (
+  gasName: string,
+  trx?: Knex.Transaction,
+): Promise<GasWithPricing | undefined> => {
+  const db = trx ?? knexController;
+  const now = new Date(Date.now());
+
+  const sql = `
+    SELECT ${GAS_WITH_PRICING_COLUMNS}
+    FROM gas g
+    JOIN gas_price gp ON g.id = gp.gas_id
+    WHERE g.name = :gasName
+      AND gp.active_from <= :now
+      AND gp.active_to > :now
+  `;
+
+  const res = await db.raw<GasWithPricing[][]>(sql, { gasName, now });
+
+  if (res[0].length > 1) {
+    throw new Error(`Multiple active prices found for ${gasName}`);
+  }
+
+  return res[0][0];
+};
+
 export const deleteFutureGasPrice = async (
   gasPriceId: string,
 ): Promise<void> => {
@@ -253,4 +280,32 @@ export const deleteFutureGasPrice = async (
       throw new Error('Expected exactly one preceding price to restore');
     }
   });
+};
+
+/**
+ * Returns the current per-litre price for a diluent fill based on He composition.
+ * Oxygen is not charged for diluent fills — only helium is billed.
+ *
+ * Formula:
+ *   pricePerLitre = (heliumPct/100 * heliumPrice)
+ */
+export const getDiluentPrice = async (
+  storageCylinderId: string,
+  heliumPercentage: number,
+  trx?: Knex.Transaction,
+): Promise<DiluentPriceResult> => {
+  const cylinder = await getStorageCylinderWithGasName(storageCylinderId, trx);
+  if (!cylinder) throw new Error('Storage cylinder not found');
+  if (cylinder.gasName !== 'Diluent')
+    throw new Error('Storage cylinder is not a diluent cylinder');
+
+  const heliumPrice = await getActiveGasPriceForGas('Helium', trx);
+  if (!heliumPrice) throw new Error('No active price found for Helium');
+
+  const pricePerLitreCents = (heliumPercentage / 100) * heliumPrice.priceEurCents;
+
+  return {
+    pricePerLitreCents,
+    heliumGasPriceId: heliumPrice.gasPriceId,
+  };
 };

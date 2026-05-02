@@ -16,8 +16,8 @@ export type Gas = Static<typeof gas>;
 export const gasWithPricing = Type.Object({
   activeFrom: Type.String({ format: 'date-time' }),
   activeTo: Type.Optional(Type.String({ format: 'date-time' })),
-  gasId: Type.String(),
-  gasPriceId: Type.String(),
+  gasId: Type.Integer(),
+  gasPriceId: Type.Integer(),
   gasName: Type.String(),
   priceEurCents: Type.Number({ minimum: 0 }),
 });
@@ -38,3 +38,9 @@ export const gasPrice = Type.Intersect([
 ]);
 
 export type GasPrice = Static<typeof gasPrice>;
+
+// Internal type used by getDiluentPrice query for DB storage
+export type DiluentPriceResult = {
+  pricePerLitreCents: number;
+  heliumGasPriceId: number;
+};

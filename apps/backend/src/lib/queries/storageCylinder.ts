@@ -3,6 +3,7 @@ import { knexController } from '../../database/database';
 import {
   type CreateStorageCylinderBody,
   type StorageCylinder,
+  type StorageCylinderWithGasName,
 } from '../../types/storageCylinder.types';
 import { log } from '../utils/log';
 
@@ -51,6 +52,29 @@ export const createStorageCylinder = async (
   await db.commit();
 
   return insertedSC;
+};
+
+export const getStorageCylinderWithGasName = async (
+  id: string,
+  trx?: Knex.Transaction,
+): Promise<StorageCylinderWithGasName | undefined> => {
+  const db = trx ?? knexController;
+
+  const res = await db.raw<Array<Array<StorageCylinderWithGasName>>>(
+    `SELECT
+       sc.id,
+       sc.gas_id    AS gasId,
+       sc.volume,
+       sc.name,
+       sc.max_pressure AS maxPressure,
+       g.name       AS gasName
+     FROM storage_cylinder sc
+     JOIN gas g ON g.id = sc.gas_id
+     WHERE sc.id = :id`,
+    { id },
+  );
+
+  return res[0][0];
 };
 
 export const getStorageCylinders = async (
