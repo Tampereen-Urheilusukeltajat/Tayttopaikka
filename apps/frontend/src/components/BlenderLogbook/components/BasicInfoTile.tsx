@@ -24,8 +24,8 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
 }) => {
   const [showClubCylinders, setShowClubCylinders] = useState(false);
 
-  const orderedCylinderSets = divingCylinderSets.sort((a, b) => a.name.localeCompare(b.name));
-  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) => a.name.localeCompare(b.name));
+  const orderedCylinderSets = divingCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
   return (
     <div>

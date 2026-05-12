@@ -5,27 +5,24 @@ import { Modal } from '../common/Modal/Modal';
 import { Form } from 'react-bootstrap';
 import { TextInput } from '../common/Inputs';
 import { format } from 'date-fns';
-import { usePatchClubCylinderSet } from '../../lib/queries/clubCylinderSetMutation';
-import { CLUB_CYLINDER_SETS_QUERY_KEY } from '../../lib/queries/queryKeys';
-import { useQueryClient } from '@tanstack/react-query';
-import { PATCH_DIVING_CYLINDER_SET_VALIDATION_SCHEMA } from '../DivingCylinderSet/validation';
+import { type PatchClubCylinderSetPayload } from '../../lib/apiRequests/clubCylinderSetRequests';
+import { PATCH_DIVING_CYLINDER_SET_VALIDATION_SCHEMA } from '../CylinderSet/validation';
+
+type PatchArgs = {
+  divingCylinderSetId: string;
+  payload: PatchClubCylinderSetPayload;
+};
 
 type ModifyClubCylinderSetModalProps = {
   clubCylinderSet: DivingCylinderSet;
   showModifyClubCylinderModal: boolean;
   closeModal: () => void;
+  onPatch: (args: PatchArgs) => void;
 };
 
 export const ModifyClubCylinderSetModal: React.FC<
   ModifyClubCylinderSetModalProps
-> = ({ clubCylinderSet, showModifyClubCylinderModal, closeModal }) => {
-  const queryClient = useQueryClient();
-  const { mutate: patchClubCylinderSet } = usePatchClubCylinderSet(() => {
-    void queryClient.refetchQueries({
-      queryKey: CLUB_CYLINDER_SETS_QUERY_KEY,
-    });
-    closeModal();
-  });
+> = ({ clubCylinderSet, showModifyClubCylinderModal, closeModal, onPatch }) => {
 
   return (
     <Formik
@@ -43,10 +40,11 @@ export const ModifyClubCylinderSetModal: React.FC<
           })),
         };
 
-        patchClubCylinderSet({
+        onPatch({
           divingCylinderSetId: clubCylinderSet.id,
           payload: updatePayload,
         });
+        closeModal();
       }}
     >
       {({ errors, handleSubmit }) => (

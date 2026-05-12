@@ -5,15 +5,19 @@ import { Modal } from '../common/Modal/Modal';
 import { Form } from 'react-bootstrap';
 import { TextInput } from '../common/Inputs';
 import { format } from 'date-fns';
-import { usePatchDivingCylinderSet } from '../../lib/queries/divingCylinderSetMutation';
-import { DIVING_CYLINDER_SETS_QUERY_KEY } from '../../lib/queries/queryKeys';
-import { useQueryClient } from '@tanstack/react-query';
-import { PATCH_DIVING_CYLINDER_SET_VALIDATION_SCHEMA } from './validation';
+import { type PatchDivingCylinderSetPayload } from '../../lib/apiRequests/divingCylinderSetRequests';
+import { PATCH_DIVING_CYLINDER_SET_VALIDATION_SCHEMA } from '../CylinderSet/validation';
+
+type PatchArgs = {
+  divingCylinderSetId: string;
+  payload: PatchDivingCylinderSetPayload;
+};
 
 type ModifyDivingCylinderSetModalProps = {
   divingCylinderSet: DivingCylinderSet;
   showModifyDivingCylinderModal: boolean;
   closeModal: () => void;
+  onPatch: (args: PatchArgs) => void;
   userId: string;
 };
 
@@ -23,18 +27,8 @@ export const ModifyDivingCylinderSetModal: React.FC<
   divingCylinderSet,
   showModifyDivingCylinderModal,
   closeModal,
-  userId,
+  onPatch,
 }) => {
-  const queryClient = useQueryClient();
-  const { mutate: patchDivingCylinderSet } = usePatchDivingCylinderSet(
-    userId,
-    () => {
-      void queryClient.refetchQueries({
-        queryKey: DIVING_CYLINDER_SETS_QUERY_KEY(userId),
-      });
-      closeModal();
-    },
-  );
 
   return (
     <Formik
@@ -55,10 +49,11 @@ export const ModifyDivingCylinderSetModal: React.FC<
           })),
         };
 
-        patchDivingCylinderSet({
+        onPatch({
           divingCylinderSetId: divingCylinderSet.id,
           payload: updatePayload,
         });
+        closeModal();
       }}
     >
       {({ errors, handleSubmit }) => (
