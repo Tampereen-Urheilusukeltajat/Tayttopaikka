@@ -24,11 +24,14 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
 }) => {
   const [showClubCylinders, setShowClubCylinders] = useState(false);
 
+  const orderedCylinderSets = divingCylinderSets.sort((a, b) => a.name.localeCompare(b.name));
+  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-2">
         <h2 className="mb-0">Esitiedot</h2>
-        {clubCylinderSets.length > 0 && (
+        {orderedClubCylinderSets.length > 0 && (
           <Form.Check
             type="switch"
             id="show-club-cylinders-blender"
@@ -51,23 +54,23 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
             type="select"
           >
             <optgroup label="Omat pullot">
-              {divingCylinderSets.map((dcs) => (
+              {orderedCylinderSets.map((dcs) => (
                 <option key={dcs.id} value={dcs.id}>
                   {/* If multiple cylinders with the same name are found, also add serial number to the name */}
                   {dcs.name}
-                  {divingCylinderSets.filter((e) => e.name === dcs.name)
+                  {orderedCylinderSets.filter((e) => e.name === dcs.name)
                     .length > 1
                     ? ` (${dcs.cylinders[0]?.serialNumber ?? 'N/A'})`
                     : ''}
                 </option>
               ))}
             </optgroup>
-            {showClubCylinders && clubCylinderSets.length > 0 && (
+            {showClubCylinders && orderedClubCylinderSets.length > 0 && (
               <optgroup label="Seuran pullot">
-                {clubCylinderSets.map((dcs) => (
+                {orderedClubCylinderSets.map((dcs) => (
                   <option key={dcs.id} value={dcs.id}>
                     {dcs.name}
-                    {clubCylinderSets.filter((e) => e.name === dcs.name)
+                    {orderedClubCylinderSets.filter((e) => e.name === dcs.name)
                       .length > 1
                       ? ` (${dcs.cylinders[0]?.serialNumber ?? 'N/A'})`
                       : ''}
