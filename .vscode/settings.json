@@ -3,8 +3,5 @@
     {
       "mode": "auto"
     }
-  ],
-  "chat.tools.terminal.autoApprove": {
-    "npx tsc": true
-  }
+  ]
 }
