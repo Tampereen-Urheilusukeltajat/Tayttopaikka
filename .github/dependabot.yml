@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/apps/backend"
+      - "/apps/frontend"
+    schedule:
+      interval: "weekly"
+    versioning-strategy: lockfile-only
+    groups:
+      npm-all:
+        patterns:
+          - "*"
+        group-by: dependency-name
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/infra/backend"
+      - "/infra/ui"
+    schedule:
+      interval: "weekly"
+    groups:
+      docker:
+        patterns:
+          - "*"
