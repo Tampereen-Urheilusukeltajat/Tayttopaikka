@@ -9,7 +9,6 @@ export default [
       'dist/**',
       'node_modules/**',
       'coverage/**',
-      'playwright.config.js',
       'vite.config.ts',
       'vite-env.d.ts',
     ],

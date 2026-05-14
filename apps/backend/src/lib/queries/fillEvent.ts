@@ -15,6 +15,7 @@ import { selectCylinderSet } from './divingCylinderSet';
 import { getUserWithId } from './user';
 import { errorHandler } from '../utils/errorHandler';
 import { type FastifyReply } from 'fastify';
+import { calcGasFillCostCents, calcTotalFillCostCents } from '@tayttopaikka/pricing';
 
 const getActivePriceId = async (
   trx: Knex.Transaction,
@@ -292,7 +293,7 @@ export const calcTotalCost = async (
         .where('id', fill.gasPriceId)
         .first('price_eur_cents as priceEurCents');
       const price = JSON.parse(JSON.stringify(gasPrice));
-      return fill.volumeLitres * price.priceEurCents;
+      return calcGasFillCostCents(fill.volumeLitres, price.priceEurCents);
     }),
   );
 
@@ -304,7 +305,5 @@ export const calcTotalCost = async (
   );
   const diluentTotal: number = diluentRes[0][0].total;
 
-  return Math.ceil(
-    gasFillCosts.reduce((acc, curValue) => acc + curValue, 0) + diluentTotal
-  );
+  return calcTotalFillCostCents(gasFillCosts, [diluentTotal]);
 };

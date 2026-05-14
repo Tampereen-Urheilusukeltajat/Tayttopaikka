@@ -1,0 +1,1203 @@
+diff --git a/apps/backend/package.json b/apps/backend/package.json
+index 509a402..e82ad0f 100644
+--- a/apps/backend/package.json
++++ b/apps/backend/package.json
+@@ -17,6 +17,7 @@
+     "db:seed:make": "knex seed:make"
+   },
+   "dependencies": {
++    "@tayttopaikka/pricing": "workspace:*",
+     "@fastify/autoload": "^6.3.1",
+     "@fastify/cors": "^11.2.0",
+     "@fastify/helmet": "^13.0.2",
+diff --git a/apps/backend/src/lib/queries/fillEvent.ts b/apps/backend/src/lib/queries/fillEvent.ts
+index 19d678d..295c7cb 100644
+--- a/apps/backend/src/lib/queries/fillEvent.ts
++++ b/apps/backend/src/lib/queries/fillEvent.ts
+@@ -15,6 +15,7 @@ import { selectCylinderSet } from './divingCylinderSet';
+ import { getUserWithId } from './user';
+ import { errorHandler } from '../utils/errorHandler';
+ import { type FastifyReply } from 'fastify';
++import { calcGasFillCostCents, calcTotalFillCostCents } from '@tayttopaikka/pricing';
+ 
+ const getActivePriceId = async (
+   trx: Knex.Transaction,
+@@ -292,7 +293,7 @@ export const calcTotalCost = async (
+         .where('id', fill.gasPriceId)
+         .first('price_eur_cents as priceEurCents');
+       const price = JSON.parse(JSON.stringify(gasPrice));
+-      return fill.volumeLitres * price.priceEurCents;
++      return calcGasFillCostCents(fill.volumeLitres, price.priceEurCents);
+     }),
+   );
+ 
+@@ -304,7 +305,5 @@ export const calcTotalCost = async (
+   );
+   const diluentTotal: number = diluentRes[0][0].total;
+ 
+-  return Math.ceil(
+-    gasFillCosts.reduce((acc, curValue) => acc + curValue, 0) + diluentTotal
+-  );
++  return calcTotalFillCostCents(gasFillCosts, [diluentTotal]);
+ };
+diff --git a/apps/backend/src/lib/queries/payment.ts b/apps/backend/src/lib/queries/payment.ts
+index f96cfd8..21099be 100644
+--- a/apps/backend/src/lib/queries/payment.ts
++++ b/apps/backend/src/lib/queries/payment.ts
+@@ -29,7 +29,7 @@ export const getUnpaidFillEvents = async (
+     WITH gas_fill_price AS (
+       SELECT
+         fe.id AS fill_event_id,
+-        SUM(fegf.volume_litres * gp.price_eur_cents) AS price
++        SUM(fegf.volume_litres * CAST(gp.price_eur_cents AS DECIMAL(6,2))) AS price
+       FROM fill_event fe
+       JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
+       JOIN gas_price gp ON gp.id = fegf.gas_price_id
+@@ -47,7 +47,7 @@ export const getUnpaidFillEvents = async (
+     fill_event_price AS (
+       SELECT
+         fe.id AS fill_event_id,
+-        COALESCE(gfp.price, 0) + COALESCE(dfp.price, 0) AS price
++        CEIL(COALESCE(gfp.price, 0) + COALESCE(dfp.price, 0)) AS price
+       FROM fill_event fe
+       LEFT JOIN gas_fill_price gfp ON gfp.fill_event_id = fe.id
+       LEFT JOIN diluent_fill_price dfp ON dfp.fill_event_id = fe.id
+@@ -108,21 +108,39 @@ export const calculateFillEventTotalPrice = async (
+     DBResponse<Array<{ totalPrice: number }>>
+   >(
+     `
+-    SELECT
+-      COALESCE(SUM(fegf.volume_litres * gp.price_eur_cents), 0) +
+-      COALESCE((
+-        SELECT SUM(price_eur_cents)
+-        FROM fill_event_diluent_fill
+-        WHERE fill_event_id IN (${fillEventIds.map(() => '?').join(',')})
+-      ), 0) AS totalPrice
+-    FROM fill_event fe
+-    JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
+-    JOIN gas_price gp ON gp.id = fegf.gas_price_id
+-    WHERE
+-      fe.id IN (${fillEventIds.map(() => '?').join(',')}) AND
+-      fegf.storage_cylinder_id IS NOT NULL
++    WITH gas_fill_price AS (
++      SELECT
++        fe.id AS fill_event_id,
++        SUM(fegf.volume_litres * CAST(gp.price_eur_cents AS DECIMAL(6,2))) AS price
++      FROM fill_event fe
++      JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
++      JOIN gas_price gp ON gp.id = fegf.gas_price_id
++      WHERE
++        fe.id IN (${fillEventIds.map(() => '?').join(',')}) AND
++        fegf.storage_cylinder_id IS NOT NULL
++      GROUP BY fe.id
++    ),
++    diluent_fill_price AS (
++      SELECT
++        fill_event_id,
++        COALESCE(SUM(price_eur_cents), 0) AS price
++      FROM fill_event_diluent_fill
++      WHERE fill_event_id IN (${fillEventIds.map(() => '?').join(',')})
++      GROUP BY fill_event_id
++    ),
++    fill_event_price AS (
++      SELECT
++        fe.id AS fill_event_id,
++        CEIL(COALESCE(gfp.price, 0) + COALESCE(dfp.price, 0)) AS price
++      FROM fill_event fe
++      LEFT JOIN gas_fill_price gfp ON gfp.fill_event_id = fe.id
++      LEFT JOIN diluent_fill_price dfp ON dfp.fill_event_id = fe.id
++      WHERE fe.id IN (${fillEventIds.map(() => '?').join(',')})
++    )
++    SELECT COALESCE(SUM(price), 0) AS totalPrice
++    FROM fill_event_price
+   `,
+-    [...fillEventIds, ...fillEventIds],
++    [...fillEventIds, ...fillEventIds, ...fillEventIds],
+   );
+ 
+   if (totalPrice?.[0]?.totalPrice === null) {
+diff --git a/apps/frontend/eslint.config.js b/apps/frontend/eslint.config.js
+index a97426e..a97cbe3 100644
+--- a/apps/frontend/eslint.config.js
++++ b/apps/frontend/eslint.config.js
+@@ -9,7 +9,6 @@ export default [
+       'dist/**',
+       'node_modules/**',
+       'coverage/**',
+-      'playwright.config.js',
+       'vite.config.ts',
+       'vite-env.d.ts',
+     ],
+diff --git a/apps/frontend/package.json b/apps/frontend/package.json
+index fb671b7..e2b631e 100644
+--- a/apps/frontend/package.json
++++ b/apps/frontend/package.json
+@@ -13,7 +13,6 @@
+     "lint": "eslint src --max-warnings 0",
+     "format": "prettier -c .",
+     "check-types": "tsc --noEmit",
+-    "test": "playwright test",
+     "test:e2e": "start-server-and-test dev 3000 test"
+   },
+   "dependencies": {
+@@ -23,6 +22,7 @@
+     "@sentry/vite-plugin": "^5.3.0",
+     "@tanstack/react-query": "^5.99.0",
+     "@tanstack/react-table": "^8.21.3",
++    "@tayttopaikka/pricing": "workspace:*",
+     "@testing-library/react": "^16.3.2",
+     "@testing-library/user-event": "^14.6.1",
+     "@types/google-libphonenumber": "^7.4.30",
+@@ -68,7 +68,6 @@
+     ]
+   },
+   "devDependencies": {
+-    "@playwright/test": "^1.59.1",
+     "@types/node": "^25.6.0",
+     "@typescript-eslint/eslint-plugin": "^8.58.2",
+     "@typescript-eslint/parser": "^8.58.2",
+diff --git a/apps/frontend/playwright.config.js b/apps/frontend/playwright.config.js
+deleted file mode 100644
+index acd5caa..0000000
+--- a/apps/frontend/playwright.config.js
++++ /dev/null
+@@ -1,106 +0,0 @@
+-import { devices } from '@playwright/test';
+-
+-/**
+- * Read environment variables from file.
+- * https://github.com/motdotla/dotenv
+- */
+-// require('dotenv').config();
+-
+-/**
+- * See https://playwright.dev/docs/test-configuration.
+- */
+-const config = {
+-  testDir: './tests',
+-  /* Maximum time one test can run for. */
+-  timeout: 30 * 1000,
+-  expect: {
+-    /**
+-     * Maximum time expect() should wait for the condition to be met.
+-     * For example in `await expect(locator).toHaveText();`
+-     */
+-    timeout: 5000,
+-  },
+-  /* Run tests in files in parallel */
+-  fullyParallel: true,
+-  /* Fail the build on CI if you accidentally left test.only in the source code. */
+-  forbidOnly: !!process.env.CI,
+-  /* Retry on CI only */
+-  retries: process.env.CI ? 2 : 0,
+-  /* Opt out of parallel tests on CI. */
+-  workers: process.env.CI ? 1 : undefined,
+-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
+-  reporter: 'html',
+-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+-  use: {
+-    /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
+-    actionTimeout: 0,
+-    /* Base URL to use in actions like `await page.goto('/')`. */
+-    baseURL: 'http://localhost:3000',
+-
+-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+-    trace: 'on-first-retry',
+-  },
+-
+-  /* Configure projects for major browsers */
+-  projects: [
+-    {
+-      name: 'chromium',
+-      use: {
+-        ...devices['Desktop Chrome'],
+-      },
+-    },
+-
+-    // {
+-    //   name: 'firefox',
+-    //   use: {
+-    //     ...devices['Desktop Firefox'],
+-    //   },
+-    // },
+-
+-    // {
+-    //   name: 'webkit',
+-    //   use: {
+-    //     ...devices['Desktop Safari'],
+-    //   },
+-    // },
+-
+-    /* Test against mobile viewports. */
+-    // {
+-    //   name: 'Mobile Chrome',
+-    //   use: {
+-    //     ...devices['Pixel 5'],
+-    //   },
+-    // },
+-    // {
+-    //   name: 'Mobile Safari',
+-    //   use: {
+-    //     ...devices['iPhone 12'],
+-    //   },
+-    // },
+-
+-    /* Test against branded browsers. */
+-    // {
+-    //   name: 'Microsoft Edge',
+-    //   use: {
+-    //     channel: 'msedge',
+-    //   },
+-    // },
+-    // {
+-    //   name: 'Google Chrome',
+-    //   use: {
+-    //     channel: 'chrome',
+-    //   },
+-    // },
+-  ],
+-
+-  /* Folder for test artifacts such as screenshots, videos, traces, etc. */
+-  // outputDir: 'test-results/',
+-
+-  /* Run your local dev server before starting the tests */
+-  // webServer: {
+-  //   command: 'npm run start',
+-  //   port: 3000,
+-  // },
+-};
+-
+-export default config;
+diff --git a/apps/frontend/src/components/BlenderLogbook/BlenderLogbook.tsx b/apps/frontend/src/components/BlenderLogbook/BlenderLogbook.tsx
+index 4afd066..fd7d1ef 100644
+--- a/apps/frontend/src/components/BlenderLogbook/BlenderLogbook.tsx
++++ b/apps/frontend/src/components/BlenderLogbook/BlenderLogbook.tsx
+@@ -10,7 +10,6 @@ import { PricingTile } from './components/PricingTile';
+ import { FillingTile } from './components/FillingTile';
+ import {
+   DiluentFillingTile,
+-  calcDiluentRowPriceEur,
+ } from './components/DiluentFillingTile';
+ import { SavingTile } from './components/SavingTile';
+ import {
+@@ -18,8 +17,14 @@ import {
+   AvailableMixtureCompositions,
+   AvailableMixtures,
+   formalizeGasMixture,
+-  formatEurToEurCents,
+ } from '../../lib/utils';
++import {
++  calcDiluentFillCostCents,
++  calcGasFillCostCents,
++  calcTotalFillCostCents,
++  calculateVolumeLitres,
++  eurCentsToEur,
++} from '@tayttopaikka/pricing';
+ import { BLENDER_FILLING_EVENT_VALIDATION_SCHEMA } from './validation';
+ import { useMutation } from '@tanstack/react-query';
+ import {
+@@ -71,6 +76,36 @@ type FormFields = FillingEventBasicInfo & {
+   fillingEventRows: FillingEventRow[];
+ };
+ 
++const computeTotalFillCostCents = (
++  fillingEventRows: FillingEventRow[],
++  diluentFillingRows: DiluentFillingRow[],
++  storageCylinders: StorageCylinder[],
++  diluentCylinders: StorageCylinder[],
++  gases: GasWithPricing[],
++): number => {
++  const gasCostsCents = fillingEventRows.map((row) => {
++    const cyl = storageCylinders.find((sc) => sc.id === row.storageCylinderId);
++    if (!cyl) return 0;
++    const priceCents = gases.find((g) => g.gasId === cyl.gasId)?.priceEurCents ?? 0;
++    return calcGasFillCostCents(
++      calculateVolumeLitres(cyl.volume, row.startPressure, row.endPressure),
++      priceCents,
++    );
++  });
++  const hePriceCents =
++    gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
++  const diluentCostsCents = diluentFillingRows.map((row) => {
++    const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
++    if (!cyl) return 0;
++    return calcDiluentFillCostCents(
++      calculateVolumeLitres(cyl.volume, row.startPressure, row.endPressure),
++      Number(row.heliumPercentage),
++      hePriceCents,
++    );
++  });
++  return calcTotalFillCostCents(gasCostsCents, diluentCostsCents);
++};
++
+ // TODO find a better way to initialize divingCylinderSetId
+ const EMPTY_FILLING_EVENT_BASIC_INFO: FillingEventBasicInfo = {
+   additionalInformation: '',
+@@ -143,15 +178,13 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
+         values.heliumPercentage,
+       );
+ 
+-      const gasFillTotal = values.fillingEventRows
+-        .map((row) => row.priceEurCents)
+-        .reduce((sum, price) => sum + price, 0);
+-      const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+-      const diluentFillTotal = values.diluentFillingRows.reduce((sum, row) => {
+-        const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
+-        return sum + calcDiluentRowPriceEur(row, cyl, hePriceCents);
+-      }, 0);
+-      const totalPriceEurCents = formatEurToEurCents(gasFillTotal + diluentFillTotal);
++      const totalPriceEurCents = computeTotalFillCostCents(
++        values.fillingEventRows,
++        values.diluentFillingRows,
++        storageCylinders,
++        diluentCylinders,
++        gases,
++      );
+ 
+       // Allow user to do pure air fills via Happihäkki page
+       const filledAir =
+@@ -194,7 +227,7 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
+         },
+       );
+     },
+-    [diluentCylinders, fillEventMutation, gases],
++    [diluentCylinders, fillEventMutation, gases, storageCylinders],
+   );
+ 
+   return (
+@@ -249,18 +282,15 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
+             />
+ 
+             <SavingTile
+-              totalPrice={
+-                values.fillingEventRows
+-                  .map((row) => row.priceEurCents)
+-                  .reduce((sum, price) => sum + price, 0) +
+-                (() => {
+-                  const heP = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+-                  return values.diluentFillingRows.reduce((sum, row) => {
+-                    const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
+-                    return sum + calcDiluentRowPriceEur(row, cyl, heP);
+-                  }, 0);
+-                })()
+-              }
++              totalPrice={eurCentsToEur(
++                computeTotalFillCostCents(
++                  values.fillingEventRows,
++                  values.diluentFillingRows,
++                  storageCylinders,
++                  diluentCylinders,
++                  gases,
++                ),
++              )}
+               errors={errors}
+               values={values}
+               isSubmitting={isSubmitting}
+diff --git a/apps/frontend/src/components/BlenderLogbook/components/DiluentFillingTile.tsx b/apps/frontend/src/components/BlenderLogbook/components/DiluentFillingTile.tsx
+index de766c2..125dc0d 100644
+--- a/apps/frontend/src/components/BlenderLogbook/components/DiluentFillingTile.tsx
++++ b/apps/frontend/src/components/BlenderLogbook/components/DiluentFillingTile.tsx
+@@ -4,10 +4,14 @@ import { BsInfoCircle, BsTrash } from 'react-icons/bs';
+ import { InputGroup, OverlayTrigger, Popover } from 'react-bootstrap';
+ import { type GasWithPricing } from '../../../lib/queries/gasQuery';
+ import { type StorageCylinder } from '../../../lib/queries/storageCylinderQuery';
++import {
++  calcDiluentFillCostCents,
++  calculateVolumeLitres,
++  eurCentsToEur,
++} from '@tayttopaikka/pricing';
+ import {
+   AvailableGasses,
+   AvailableMixtures,
+-  formatEurCentsToEur,
+ } from '../../../lib/utils';
+ import {
+   ButtonType,
+@@ -25,17 +29,15 @@ type DiluentRow = {
+   heliumPercentage: string;
+ };
+ 
+-/** Returns the row price in EUR (same unit as regular fillingEventRows.priceEurCents). */
+-export const calcDiluentRowPriceEur = (
++/** Returns the row price in EUR for display. */
++const calcDiluentRowPriceEur = (
+   row: DiluentRow,
+   cylinder: StorageCylinder | undefined,
+   hePriceCents: number,
+ ): number => {
+   if (!cylinder) return 0;
+-  const totalVolumeLitres = Math.ceil(row.startPressure - row.endPressure) * cylinder.volume;
+-  const hePct = Number(row.heliumPercentage);
+-  const totalCents = Math.ceil((hePct / 100) * hePriceCents * totalVolumeLitres);
+-  return formatEurCentsToEur(totalCents);
++  const totalVolumeLitres = calculateVolumeLitres(cylinder.volume, row.startPressure, row.endPressure);
++  return eurCentsToEur(calcDiluentFillCostCents(totalVolumeLitres, Number(row.heliumPercentage), hePriceCents));
+ };
+ 
+ type ReadOnlyFieldProps = { label: string; value: number; unit: string };
+@@ -70,7 +72,7 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
+   const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+ 
+   const totalVolumeLitres =
+-    cylinder && row ? Math.ceil(row.startPressure - row.endPressure) * cylinder.volume : 0;
++    cylinder && row ? calculateVolumeLitres(cylinder.volume, row.startPressure, row.endPressure) : 0;
+ 
+   const hePct = Number(row?.heliumPercentage ?? 0);
+   const heVolumeLitres = (hePct / 100) * totalVolumeLitres;
+diff --git a/apps/frontend/src/components/BlenderLogbook/components/FillingTile.tsx b/apps/frontend/src/components/BlenderLogbook/components/FillingTile.tsx
+index eb0c5c9..6ba7fa2 100644
+--- a/apps/frontend/src/components/BlenderLogbook/components/FillingTile.tsx
++++ b/apps/frontend/src/components/BlenderLogbook/components/FillingTile.tsx
+@@ -4,10 +4,11 @@ import { BsTrash } from 'react-icons/bs';
+ import { type GasWithPricing } from '../../../lib/queries/gasQuery';
+ import { type StorageCylinder } from '../../../lib/queries/storageCylinderQuery';
+ import {
+-  calculateGasConsumption,
+-  formatEurCentsToEur,
+-  mapGasToName,
+-} from '../../../lib/utils';
++  calcGasFillCostCents,
++  calculateVolumeLitres,
++  eurCentsToEur,
++} from '@tayttopaikka/pricing';
++import { mapGasToName } from '../../../lib/utils';
+ import {
+   ButtonType,
+   ElementButton,
+@@ -57,12 +58,15 @@ const FillingEventRowComponent: React.FC<FillingEventRowProps> = ({
+   useEffect(() => {
+     setFieldValue(
+       `fillingEventRows.${index}.priceEurCents`,
+-      formatEurCentsToEur(
+-        calculateGasConsumption(
+-          storageCylinderVolume ?? 0,
+-          startPressure ?? 0,
+-          endPressure ?? 0,
+-        ) * (gasPriceEurCents ?? 0),
++      eurCentsToEur(
++        calcGasFillCostCents(
++          calculateVolumeLitres(
++            storageCylinderVolume ?? 0,
++            startPressure ?? 0,
++            endPressure ?? 0,
++          ),
++          gasPriceEurCents ?? 0,
++        ),
+       ),
+     );
+   }, [
+@@ -77,7 +81,7 @@ const FillingEventRowComponent: React.FC<FillingEventRowProps> = ({
+   useEffect(() => {
+     setFieldValue(
+       `fillingEventRows.${index}.consumption`,
+-      calculateGasConsumption(
++      calculateVolumeLitres(
+         storageCylinderVolume ?? 0,
+         startPressure ?? 0,
+         endPressure ?? 0,
+diff --git a/apps/frontend/src/components/BlenderLogbook/components/PricingTile.tsx b/apps/frontend/src/components/BlenderLogbook/components/PricingTile.tsx
+index c3be224..1f558c1 100644
+--- a/apps/frontend/src/components/BlenderLogbook/components/PricingTile.tsx
++++ b/apps/frontend/src/components/BlenderLogbook/components/PricingTile.tsx
+@@ -1,8 +1,9 @@
+-import { formatEurCentsToEur, mapGasToName } from '../../../lib/utils';
++import {  mapGasToName } from '../../../lib/utils';
+ import React from 'react';
+ import { type GasWithPricing } from '../../../lib/queries/gasQuery';
+ import styles from './PricingTile.module.scss';
+ import { type CommonTileProps } from '../BlenderLogbook';
++import { eurCentsToEur } from '@tayttopaikka/pricing';
+ 
+ type PricingTileProps = CommonTileProps & {
+   gases: GasWithPricing[];
+@@ -14,7 +15,7 @@ export const PricingTile: React.FC<PricingTileProps> = ({ gases }) => (
+     {gases.map((gas) => (
+       <div key={`${gas.gasId}`} className={styles.priceRow}>
+         <span>{mapGasToName(gas.gasName)}:</span>
+-        <span>{formatEurCentsToEur(gas.priceEurCents)}</span>
++        <span>{eurCentsToEur(gas.priceEurCents)}</span>
+       </div>
+     ))}
+   </div>
+diff --git a/apps/frontend/src/components/FillEvents/ListFillEvents.tsx b/apps/frontend/src/components/FillEvents/ListFillEvents.tsx
+index 9afe7ec..feeb692 100644
+--- a/apps/frontend/src/components/FillEvents/ListFillEvents.tsx
++++ b/apps/frontend/src/components/FillEvents/ListFillEvents.tsx
+@@ -1,12 +1,12 @@
+ import { compareDesc, format } from 'date-fns';
+ import { useFillEventQuery } from '../../lib/queries/FillEventQuery';
+-import { formatEurCentsToEur } from '../../lib/utils';
+ import {
+   CommonTable,
+   type TableColumn,
+   type TableRow,
+ } from '../common/Table/CommonTable';
+ import { useMemo, type JSX } from 'react';
++import { eurCentsToEur } from '@tayttopaikka/pricing';
+ 
+ const FILL_EVENT_COLUMNS: TableColumn[] = [
+   {
+@@ -52,7 +52,7 @@ export const ListFillEvents = (): JSX.Element => {
+             fillEvent.gasMixture,
+             fillEvent.compressorName ?? '',
+             fillEvent.description,
+-            formatEurCentsToEur(fillEvent.price),
++            eurCentsToEur(fillEvent.price),
+           ],
+         })) ?? [],
+     [fillEvents],
+@@ -63,7 +63,7 @@ export const ListFillEvents = (): JSX.Element => {
+         <h1>Täyttöhistoria</h1>
+         <h2>
+           Täyttöjen hinta yhteensä:{' '}
+-          {formatEurCentsToEur(
++          {eurCentsToEur(
+             fillEvents?.reduce((acc, fillEvent) => acc + fillEvent.price, 0) ??
+               0,
+           )}{' '}
+diff --git a/apps/frontend/src/lib/utils.ts b/apps/frontend/src/lib/utils.ts
+index 0ac573d..a9092db 100644
+--- a/apps/frontend/src/lib/utils.ts
++++ b/apps/frontend/src/lib/utils.ts
+@@ -69,15 +69,6 @@ export const mapGasToName = (gas?: AvailableGasses): string => {
+   }
+ };
+ 
+-export const formatEurCentsToEur = (eurCents: number): number =>
+-  parseFloat((eurCents / 100).toFixed(3));
+-export const formatEurToEurCents = (eur: number): number => eur * 100;
+-
+-export const calculateGasConsumption = (
+-  cylinderVolume: number,
+-  startPressure: number,
+-  endPressure: number,
+-): number => (startPressure - endPressure) * cylinderVolume;
+ 
+ export const tokenExpired = (exp: number): boolean =>
+   // Date now gives timestamp in ms, token has seconds
+diff --git a/apps/frontend/src/views/GasPrices/GasPrices.tsx b/apps/frontend/src/views/GasPrices/GasPrices.tsx
+index 78fed4f..e3a9fbc 100644
+--- a/apps/frontend/src/views/GasPrices/GasPrices.tsx
++++ b/apps/frontend/src/views/GasPrices/GasPrices.tsx
+@@ -9,7 +9,7 @@ import {
+   useReactTable,
+ } from '@tanstack/react-table';
+ import { useAllGasPricesQuery, type GasWithPricing } from '../../lib/queries/gasQuery';
+-import { formatEurCentsToEur, mapGasToName } from '../../lib/utils';
++import { mapGasToName } from '../../lib/utils';
+ import { PrimaryButton, ElementButton } from '../../components/common/Button/Buttons';
+ import { Modal } from '../../components/common/Modal/Modal';
+ import { CommonTableV2 } from '../../components/common/Table/CommonTable-v2';
+@@ -17,6 +17,7 @@ import styles from '../../components/common/Table/CommonTable.module.scss';
+ import { GasPriceModal } from './GasPriceModal';
+ import { useDeleteGasPriceMutation } from '../../lib/queries/gasMutations';
+ import { useState } from 'react';
++import { eurCentsToEur } from '@tayttopaikka/pricing';
+ 
+ type PriceRow = GasWithPricing & {
+   subRows?: PriceRow[];
+@@ -51,7 +52,7 @@ const buildTableRows = (prices: GasWithPricing[]): PriceRow[] => {
+ };
+ 
+ const formatDate = (iso: string): string => format(new Date(iso), 'dd.MM.yyyy');
+-const formatPrice = (cents: number): string => `${formatEurCentsToEur(cents)} €`;
++const formatPrice = (cents: number): string => `${eurCentsToEur(cents)} €`;
+ const formatActiveTo = (iso: string | undefined): string => {
+   if (!iso || iso.startsWith('9999')) return 'Toistaiseksi';
+   return formatDate(iso);
+diff --git a/apps/frontend/src/views/Invoice/Invoice.tsx b/apps/frontend/src/views/Invoice/Invoice.tsx
+index 49a1c66..630f186 100644
+--- a/apps/frontend/src/views/Invoice/Invoice.tsx
++++ b/apps/frontend/src/views/Invoice/Invoice.tsx
+@@ -5,13 +5,13 @@ import {
+   type TableColumn,
+ } from '../../components/common/Table/CommonTable';
+ import { type Invoice, useInvoiceQuery } from '../../lib/queries/invoiceQuery';
+-import { formatEurCentsToEur } from '../../lib/utils';
+ import { format } from 'date-fns';
+ import { PrimaryButton } from '../../components/common/Button/Buttons';
+ import { utils, writeFileXLSX } from 'xlsx';
+ import { Modal } from '../../components/common/Modal/Modal';
+ import { toast } from 'react-toastify';
+ import { useInvoicePaymentEventsMutation } from '../../lib/queries/invoicePaymentEventMutation';
++import { eurCentsToEur } from '@tayttopaikka/pricing';
+ 
+ const INVOICE_COLUMNS: TableColumn[] = [
+   {
+@@ -72,7 +72,7 @@ export const InvoicePage: React.FC = () => {
+               null,
+               null,
+               null,
+-              formatEurCentsToEur(invoice.invoiceTotal),
++              eurCentsToEur(invoice.invoiceTotal),
+             ],
+             childRows: invoice.invoiceRows.map((row) => [
+               null,
+@@ -80,7 +80,7 @@ export const InvoicePage: React.FC = () => {
+               format(new Date(row.date), 'dd.MM.yyyy HH:mm'),
+               row.gasMixture,
+               row.description,
+-              formatEurCentsToEur(row.price),
++              eurCentsToEur(row.price),
+             ]),
+           };
+         }) ?? [],
+@@ -101,11 +101,11 @@ export const InvoicePage: React.FC = () => {
+           .map((invoice) => ({
+             Nimi: `${invoice.user.surname} ${invoice.user.forename}`,
+             Yhteystiedot: invoice.user.email,
+-            'Hinta (€)': formatEurCentsToEur(invoice.invoiceTotal),
++            'Hinta (€)': eurCentsToEur(invoice.invoiceTotal),
+             Tapahtumat: invoice.invoiceRows
+               .map(
+                 (row) =>
+-                  `${format(new Date(row.date), 'dd.MM.yyyy HH:mm')} ${row.gasMixture} ${row.description} ${formatEurCentsToEur(row.price)} €`,
++                  `${format(new Date(row.date), 'dd.MM.yyyy HH:mm')} ${row.gasMixture} ${row.description} ${eurCentsToEur(row.price)} €`,
+               )
+               .join(', '),
+           })),
+diff --git a/packages/pricing/eslint.config.js b/packages/pricing/eslint.config.js
+new file mode 100644
+index 0000000..60f1228
+--- /dev/null
++++ b/packages/pricing/eslint.config.js
+@@ -0,0 +1,29 @@
++import tseslint from '@typescript-eslint/eslint-plugin';
++import tsparser from '@typescript-eslint/parser';
++import eslintConfigPrettier from 'eslint-config-prettier';
++
++export default [
++  {
++    ignores: ['dist/**', 'node_modules/**'],
++  },
++  {
++    files: ['**/*.ts'],
++    languageOptions: {
++      parser: tsparser,
++      parserOptions: {
++        project: './tsconfig.test.json',
++        ecmaVersion: 'latest',
++        sourceType: 'module',
++      },
++    },
++    plugins: {
++      '@typescript-eslint': tseslint,
++    },
++    rules: {
++      semi: ['error', 'always'],
++      '@typescript-eslint/semi': ['error', 'always'],
++      'eol-last': ['error', 'always'],
++    },
++  },
++  eslintConfigPrettier,
++];
+diff --git a/packages/pricing/package.json b/packages/pricing/package.json
+new file mode 100644
+index 0000000..7c916bf
+--- /dev/null
++++ b/packages/pricing/package.json
+@@ -0,0 +1,32 @@
++{
++  "name": "@tayttopaikka/pricing",
++  "version": "0.0.1",
++  "private": true,
++  "main": "./dist/cjs/index.js",
++  "module": "./dist/esm/index.js",
++  "types": "./dist/cjs/index.d.ts",
++  "exports": {
++    ".": {
++      "types": "./dist/cjs/index.d.ts",
++      "import": "./dist/esm/index.js",
++      "require": "./dist/cjs/index.js"
++    }
++  },
++  "scripts": {
++    "build": "tsc && tsc -p tsconfig.esm.json",
++    "check-types": "tsc --noEmit -p tsconfig.test.json",
++    "lint": "eslint src --max-warnings 0",
++    "format": "prettier -c .",
++    "test": "tsx --test src/**/*.test.ts"
++  },
++  "devDependencies": {
++    "@types/node": "^22.0.0",
++    "@typescript-eslint/eslint-plugin": "^8.58.2",
++    "@typescript-eslint/parser": "^8.58.2",
++    "eslint": "^9.39.4",
++    "eslint-config-prettier": "^10.1.8",
++    "prettier": "^3.8.3",
++    "tsx": "^4.21.0",
++    "typescript": "^5.9.3"
++  }
++}
+diff --git a/packages/pricing/src/index.ts b/packages/pricing/src/index.ts
+new file mode 100644
+index 0000000..19840b4
+--- /dev/null
++++ b/packages/pricing/src/index.ts
+@@ -0,0 +1,54 @@
++/**
++ * Convert euro cents to euros, rounded to 3 decimal places for display.
++ */
++export const eurCentsToEur = (cents: number): number =>
++  parseFloat((cents / 100).toFixed(3));
++
++/**
++ * Volume consumed from a storage cylinder in litres.
++ * The pressure difference is ceiled to guard against floating-point artefacts,
++ * matching the server-side calculation exactly.
++ */
++export const calculateVolumeLitres = (
++  cylinderVolume: number,
++  startPressure: number,
++  endPressure: number,
++): number => Math.ceil(startPressure - endPressure) * cylinderVolume;
++
++/**
++ * Raw cost of a single regular gas fill in euro cents (not rounded).
++ * Sum costs from multiple rows before rounding with calcTotalFillCostCents.
++ */
++export const calcGasFillCostCents = (
++  volumeLitres: number,
++  pricePerLitreCents: number,
++): number => volumeLitres * pricePerLitreCents;
++
++/**
++ * Cost of a diluent fill in euro cents, rounded up to the nearest cent.
++ * Formula: ceil((hePct / 100) * hePriceCents * volumeLitres)
++ *
++ * toFixed(10) strips floating-point noise (e.g. 0.4*6*100 = 240.00000000000003)
++ * before ceiling, matching the result of MariaDB DECIMAL arithmetic.
++ */
++export const calcDiluentFillCostCents = (
++  volumeLitres: number,
++  hePct: number,
++  hePriceCents: number,
++): number => {
++  const raw = (hePct / 100) * hePriceCents * volumeLitres;
++  return Math.ceil(parseFloat(raw.toFixed(10)));
++};
++
++/**
++ * Total fill cost in whole euro cents.
++ * All individual costs are summed first, then ceiled once to minimise rounding errors.
++ */
++export const calcTotalFillCostCents = (
++  gasCostsCents: number[],
++  diluentCostsCents: number[],
++): number =>
++  Math.ceil(
++    gasCostsCents.reduce((a, b) => a + b, 0) +
++      diluentCostsCents.reduce((a, b) => a + b, 0),
++  );
+diff --git a/packages/pricing/tsconfig.esm.json b/packages/pricing/tsconfig.esm.json
+new file mode 100644
+index 0000000..a5aa506
+--- /dev/null
++++ b/packages/pricing/tsconfig.esm.json
+@@ -0,0 +1,10 @@
++{
++  "extends": "./tsconfig.json",
++  "compilerOptions": {
++    "module": "esnext",
++    "moduleResolution": "bundler",
++    "outDir": "./dist/esm",
++    "declaration": false,
++    "declarationMap": false
++  }
++}
+diff --git a/packages/pricing/tsconfig.json b/packages/pricing/tsconfig.json
+new file mode 100644
+index 0000000..fcc1583
+--- /dev/null
++++ b/packages/pricing/tsconfig.json
+@@ -0,0 +1,14 @@
++{
++  "compilerOptions": {
++    "target": "es2022",
++    "module": "commonjs",
++    "declaration": true,
++    "declarationMap": true,
++    "outDir": "./dist/cjs",
++    "rootDir": "./src",
++    "strict": true,
++    "skipLibCheck": true
++  },
++  "include": ["src"],
++  "exclude": ["src/**/*.test.ts"]
++}
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 6b810f4..03db71e 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -50,6 +50,9 @@ importers:
+       '@sinclair/typebox':
+         specifier: ^0.34.49
+         version: 0.34.49
++      '@tayttopaikka/pricing':
++        specifier: workspace:*
++        version: link:../../packages/pricing
+       bcrypt:
+         specifier: ^6.0.0
+         version: 6.0.0
+@@ -150,6 +153,9 @@ importers:
+       '@tanstack/react-table':
+         specifier: ^8.21.3
+         version: 8.21.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
++      '@tayttopaikka/pricing':
++        specifier: workspace:*
++        version: link:../../packages/pricing
+       '@testing-library/react':
+         specifier: ^16.3.2
+         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+@@ -226,9 +232,6 @@ importers:
+         specifier: ^1.7.1
+         version: 1.7.1
+     devDependencies:
+-      '@playwright/test':
+-        specifier: ^1.59.1
+-        version: 1.59.1
+       '@types/node':
+         specifier: ^25.6.0
+         version: 25.6.0
+@@ -269,6 +272,33 @@ importers:
+         specifier: ^2.1.5
+         version: 2.1.5
+ 
++  packages/pricing:
++    devDependencies:
++      '@types/node':
++        specifier: ^22.0.0
++        version: 22.19.19
++      '@typescript-eslint/eslint-plugin':
++        specifier: ^8.58.2
++        version: 8.58.2(@typescript-eslint/parser@8.58.2(eslint@9.39.4)(typescript@5.9.3))(eslint@9.39.4)(typescript@5.9.3)
++      '@typescript-eslint/parser':
++        specifier: ^8.58.2
++        version: 8.58.2(eslint@9.39.4)(typescript@5.9.3)
++      eslint:
++        specifier: ^9.39.4
++        version: 9.39.4
++      eslint-config-prettier:
++        specifier: ^10.1.8
++        version: 10.1.8(eslint@9.39.4)
++      prettier:
++        specifier: ^3.8.3
++        version: 3.8.3
++      tsx:
++        specifier: ^4.21.0
++        version: 4.21.0
++      typescript:
++        specifier: ^5.9.3
++        version: 5.9.3
++
+ packages:
+ 
+   '@babel/code-frame@7.29.0':
+@@ -958,11 +988,6 @@ packages:
+   '@pinojs/redact@0.4.0':
+     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
+ 
+-  '@playwright/test@1.59.1':
+-    resolution: {integrity: sha512-PG6q63nQg5c9rIi4/Z5lR5IVF7yU5MqmKaPOe0HSc0O2cX1fPi96sUQu5j7eo4gKCkB2AnNGoWt7y4/Xx3Kcqg==}
+-    engines: {node: '>=18'}
+-    hasBin: true
+-
+   '@popperjs/core@2.11.8':
+     resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
+ 
+@@ -1912,6 +1937,9 @@ packages:
+   '@types/node-cron@3.0.11':
+     resolution: {integrity: sha512-0ikrnug3/IyneSHqCBeslAhlK2aBfYek1fGo4bP4QnZPmiqSGRK+Oy7ZMisLWkesffJvQ1cqAcBnJC+8+nxIAg==}
+ 
++  '@types/node@22.19.19':
++    resolution: {integrity: sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==}
++
+   '@types/node@25.6.0':
+     resolution: {integrity: sha512-+qIYRKdNYJwY3vRCZMdJbPLJAtGjQBudzZzdzwQYkEPQd+PJGixUL5QfvCLDaULoLv+RhT3LDkwEfKaAkgSmNQ==}
+ 
+@@ -2920,11 +2948,6 @@ packages:
+   from@0.1.7:
+     resolution: {integrity: sha512-twe20eF1OxVxp/ML/kq2p1uc6KvFK/+vs8WjEbeKmV2He22MKm7YF2ANIt+EOqhJ5L3K/SuuPhk0hWQDjOM23g==}
+ 
+-  fsevents@2.3.2:
+-    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+-    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+-    os: [darwin]
+-
+   fsevents@2.3.3:
+     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
+     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+@@ -3670,16 +3693,6 @@ packages:
+     resolution: {integrity: sha512-r34yH/GlQpKZbU1BvFFqOjhISRo1MNx1tWYsYvmj6KIRHSPMT2+yHOEb1SG6NMvRoHRF0a07kCOox/9yakl1vg==}
+     hasBin: true
+ 
+-  playwright-core@1.59.1:
+-    resolution: {integrity: sha512-HBV/RJg81z5BiiZ9yPzIiClYV/QMsDCKUyogwH9p3MCP6IYjUFu/MActgYAvK0oWyV9NlwM3GLBjADyWgydVyg==}
+-    engines: {node: '>=18'}
+-    hasBin: true
+-
+-  playwright@1.59.1:
+-    resolution: {integrity: sha512-C8oWjPR3F81yljW9o5OxcWzfh6avkVwDD2VYdwIGqTkl+OGFISgypqzfu7dOe4QNLL2aqcWBmI3PMtLIK233lw==}
+-    engines: {node: '>=18'}
+-    hasBin: true
+-
+   possible-typed-array-names@1.1.0:
+     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
+     engines: {node: '>= 0.4'}
+@@ -4376,6 +4389,9 @@ packages:
+   undefsafe@2.0.5:
+     resolution: {integrity: sha512-WxONCrssBM8TSPRqN5EmsjVrsv4A8X12J4ArBiiayv3DyyG3ZlIg6yysuuSYdZsVz3TKcTg2fd//Ujd4CHV1iA==}
+ 
++  undici-types@6.21.0:
++    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
++
+   undici-types@7.19.2:
+     resolution: {integrity: sha512-qYVnV5OEm2AW8cJMCpdV20CDyaN3g0AjDlOGf1OW4iaDEx8MwdtChUp4zu4H0VP3nDRF/8RKWH+IPp9uW0YGZg==}
+ 
+@@ -4582,7 +4598,7 @@ snapshots:
+       '@babel/types': 7.29.0
+       '@jridgewell/remapping': 2.3.5
+       convert-source-map: 2.0.0
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       gensync: 1.0.0-beta.2
+       json5: 2.2.3
+       semver: 6.3.1
+@@ -4654,7 +4670,7 @@ snapshots:
+       '@babel/parser': 7.29.2
+       '@babel/template': 7.28.6
+       '@babel/types': 7.29.0
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+     transitivePeerDependencies:
+       - supports-color
+ 
+@@ -4769,7 +4785,7 @@ snapshots:
+   '@eslint/config-array@0.21.2':
+     dependencies:
+       '@eslint/object-schema': 2.1.7
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       minimatch: 3.1.5
+     transitivePeerDependencies:
+       - supports-color
+@@ -4785,7 +4801,7 @@ snapshots:
+   '@eslint/eslintrc@3.3.5':
+     dependencies:
+       ajv: 6.14.0
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       espree: 10.4.0
+       globals: 14.0.0
+       ignore: 5.3.2
+@@ -5277,10 +5293,6 @@ snapshots:
+ 
+   '@pinojs/redact@0.4.0': {}
+ 
+-  '@playwright/test@1.59.1':
+-    dependencies:
+-      playwright: 1.59.1
+-
+   '@popperjs/core@2.11.8': {}
+ 
+   '@prisma/instrumentation@7.6.0(@opentelemetry/api@1.9.1)':
+@@ -6201,6 +6213,10 @@ snapshots:
+ 
+   '@types/node-cron@3.0.11': {}
+ 
++  '@types/node@22.19.19':
++    dependencies:
++      undici-types: 6.21.0
++
+   '@types/node@25.6.0':
+     dependencies:
+       undici-types: 7.19.2
+@@ -6275,7 +6291,7 @@ snapshots:
+       '@typescript-eslint/types': 8.54.0
+       '@typescript-eslint/typescript-estree': 8.54.0(typescript@5.9.3)
+       '@typescript-eslint/visitor-keys': 8.54.0
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       eslint: 9.39.4
+       typescript: 5.9.3
+     transitivePeerDependencies:
+@@ -6287,7 +6303,7 @@ snapshots:
+       '@typescript-eslint/types': 8.58.2
+       '@typescript-eslint/typescript-estree': 8.58.2(typescript@5.9.3)
+       '@typescript-eslint/visitor-keys': 8.58.2
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       eslint: 9.39.4
+       typescript: 5.9.3
+     transitivePeerDependencies:
+@@ -6295,9 +6311,9 @@ snapshots:
+ 
+   '@typescript-eslint/project-service@8.54.0(typescript@5.9.3)':
+     dependencies:
+-      '@typescript-eslint/tsconfig-utils': 8.54.0(typescript@5.9.3)
+-      '@typescript-eslint/types': 8.54.0
+-      debug: 4.4.3(supports-color@5.5.0)
++      '@typescript-eslint/tsconfig-utils': 8.58.2(typescript@5.9.3)
++      '@typescript-eslint/types': 8.58.2
++      debug: 4.4.3
+       typescript: 5.9.3
+     transitivePeerDependencies:
+       - supports-color
+@@ -6306,7 +6322,7 @@ snapshots:
+     dependencies:
+       '@typescript-eslint/tsconfig-utils': 8.58.2(typescript@5.9.3)
+       '@typescript-eslint/types': 8.58.2
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       typescript: 5.9.3
+     transitivePeerDependencies:
+       - supports-color
+@@ -6334,7 +6350,7 @@ snapshots:
+       '@typescript-eslint/types': 8.54.0
+       '@typescript-eslint/typescript-estree': 8.54.0(typescript@5.9.3)
+       '@typescript-eslint/utils': 8.54.0(eslint@9.39.4)(typescript@5.9.3)
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       eslint: 9.39.4
+       ts-api-utils: 2.5.0(typescript@5.9.3)
+       typescript: 5.9.3
+@@ -6346,7 +6362,7 @@ snapshots:
+       '@typescript-eslint/types': 8.58.2
+       '@typescript-eslint/typescript-estree': 8.58.2(typescript@5.9.3)
+       '@typescript-eslint/utils': 8.58.2(eslint@9.39.4)(typescript@5.9.3)
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       eslint: 9.39.4
+       ts-api-utils: 2.5.0(typescript@5.9.3)
+       typescript: 5.9.3
+@@ -6363,7 +6379,7 @@ snapshots:
+       '@typescript-eslint/tsconfig-utils': 8.54.0(typescript@5.9.3)
+       '@typescript-eslint/types': 8.54.0
+       '@typescript-eslint/visitor-keys': 8.54.0
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       minimatch: 9.0.9
+       semver: 7.7.4
+       tinyglobby: 0.2.16
+@@ -6378,7 +6394,7 @@ snapshots:
+       '@typescript-eslint/tsconfig-utils': 8.58.2(typescript@5.9.3)
+       '@typescript-eslint/types': 8.58.2
+       '@typescript-eslint/visitor-keys': 8.58.2
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       minimatch: 10.2.5
+       semver: 7.7.4
+       tinyglobby: 0.2.16
+@@ -6549,7 +6565,7 @@ snapshots:
+ 
+   agent-base@6.0.2:
+     dependencies:
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+     transitivePeerDependencies:
+       - supports-color
+ 
+@@ -6909,6 +6925,10 @@ snapshots:
+     dependencies:
+       ms: 2.1.2
+ 
++  debug@4.4.3:
++    dependencies:
++      ms: 2.1.3
++
+   debug@4.4.3(supports-color@5.5.0):
+     dependencies:
+       ms: 2.1.3
+@@ -7257,7 +7277,7 @@ snapshots:
+       ajv: 6.14.0
+       chalk: 4.1.2
+       cross-spawn: 7.0.6
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       escape-string-regexp: 4.0.0
+       eslint-scope: 8.4.0
+       eslint-visitor-keys: 4.2.1
+@@ -7436,7 +7456,7 @@ snapshots:
+ 
+   follow-redirects@1.16.0(debug@4.4.3):
+     optionalDependencies:
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+ 
+   for-each@0.3.5:
+     dependencies:
+@@ -7468,9 +7488,6 @@ snapshots:
+ 
+   from@0.1.7: {}
+ 
+-  fsevents@2.3.2:
+-    optional: true
+-
+   fsevents@2.3.3:
+     optional: true
+ 
+@@ -7608,7 +7625,7 @@ snapshots:
+   https-proxy-agent@5.0.1:
+     dependencies:
+       agent-base: 6.0.2
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+     transitivePeerDependencies:
+       - supports-color
+ 
+@@ -8208,14 +8225,6 @@ snapshots:
+       sonic-boom: 4.2.1
+       thread-stream: 4.0.0
+ 
+-  playwright-core@1.59.1: {}
+-
+-  playwright@1.59.1:
+-    dependencies:
+-      playwright-core: 1.59.1
+-    optionalDependencies:
+-      fsevents: 2.3.2
+-
+   possible-typed-array-names@1.1.0: {}
+ 
+   postcss@8.5.10:
+@@ -8692,7 +8701,7 @@ snapshots:
+       arg: 5.0.2
+       bluebird: 3.7.2
+       check-more-types: 2.24.0
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       execa: 5.1.1
+       lazy-ass: 1.6.0
+       ps-tree: 1.2.0
+@@ -8981,6 +8990,8 @@ snapshots:
+ 
+   undefsafe@2.0.5: {}
+ 
++  undici-types@6.21.0: {}
++
+   undici-types@7.19.2: {}
+ 
+   update-browserslist-db@1.2.3(browserslist@4.28.2):
+@@ -9014,7 +9025,7 @@ snapshots:
+ 
+   vite-tsconfig-paths@6.1.1(typescript@5.9.3)(vite@7.3.2(@types/node@25.6.0)(sass@1.99.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.3)):
+     dependencies:
+-      debug: 4.4.3(supports-color@5.5.0)
++      debug: 4.4.3
+       globrex: 0.1.2
+       tsconfck: 3.1.6(typescript@5.9.3)
+       vite: 7.3.2(@types/node@25.6.0)(sass@1.99.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.3)
+diff --git a/turbo.json b/turbo.json
+index 233f373..711a5cd 100644
+--- a/turbo.json
++++ b/turbo.json
+@@ -19,7 +19,8 @@
+     },
+     "dev": {
+       "cache": false,
+-      "persistent": true
++      "persistent": true,
++      "dependsOn": ["@tayttopaikka/pricing#build"]
+     }
+   }
+ }

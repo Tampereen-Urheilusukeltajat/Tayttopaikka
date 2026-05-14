@@ -5,9 +5,13 @@ import { InputGroup, OverlayTrigger, Popover } from 'react-bootstrap';
 import { type GasWithPricing } from '../../../lib/queries/gasQuery';
 import { type StorageCylinder } from '../../../lib/queries/storageCylinderQuery';
 import {
+  calcDiluentFillCostCents,
+  calculateVolumeLitres,
+  eurCentsToEur,
+} from '@tayttopaikka/pricing';
+import {
   AvailableGasses,
   AvailableMixtures,
-  formatEurCentsToEur,
 } from '../../../lib/utils';
 import {
   ButtonType,
@@ -25,17 +29,15 @@ type DiluentRow = {
   heliumPercentage: string;
 };
 
-/** Returns the row price in EUR (same unit as regular fillingEventRows.priceEurCents). */
-export const calcDiluentRowPriceEur = (
+/** Returns the row price in EUR for display. */
+const calcDiluentRowPriceEur = (
   row: DiluentRow,
   cylinder: StorageCylinder | undefined,
   hePriceCents: number,
 ): number => {
   if (!cylinder) return 0;
-  const totalVolumeLitres = Math.ceil(row.startPressure - row.endPressure) * cylinder.volume;
-  const hePct = Number(row.heliumPercentage);
-  const totalCents = Math.ceil((hePct / 100) * hePriceCents * totalVolumeLitres);
-  return formatEurCentsToEur(totalCents);
+  const totalVolumeLitres = calculateVolumeLitres(cylinder.volume, row.startPressure, row.endPressure);
+  return eurCentsToEur(calcDiluentFillCostCents(totalVolumeLitres, Number(row.heliumPercentage), hePriceCents));
 };
 
 type ReadOnlyFieldProps = { label: string; value: number; unit: string };
@@ -70,7 +72,7 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
   const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
 
   const totalVolumeLitres =
-    cylinder && row ? Math.ceil(row.startPressure - row.endPressure) * cylinder.volume : 0;
+    cylinder && row ? calculateVolumeLitres(cylinder.volume, row.startPressure, row.endPressure) : 0;
 
   const hePct = Number(row?.heliumPercentage ?? 0);
   const heVolumeLitres = (hePct / 100) * totalVolumeLitres;

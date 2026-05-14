@@ -5,13 +5,13 @@ import {
   type TableColumn,
 } from '../../components/common/Table/CommonTable';
 import { type Invoice, useInvoiceQuery } from '../../lib/queries/invoiceQuery';
-import { formatEurCentsToEur } from '../../lib/utils';
 import { format } from 'date-fns';
 import { PrimaryButton } from '../../components/common/Button/Buttons';
 import { utils, writeFileXLSX } from 'xlsx';
 import { Modal } from '../../components/common/Modal/Modal';
 import { toast } from 'react-toastify';
 import { useInvoicePaymentEventsMutation } from '../../lib/queries/invoicePaymentEventMutation';
+import { eurCentsToEur } from '@tayttopaikka/pricing';
 
 const INVOICE_COLUMNS: TableColumn[] = [
   {
@@ -72,7 +72,7 @@ export const InvoicePage: React.FC = () => {
               null,
               null,
               null,
-              formatEurCentsToEur(invoice.invoiceTotal),
+              eurCentsToEur(invoice.invoiceTotal),
             ],
             childRows: invoice.invoiceRows.map((row) => [
               null,
@@ -80,7 +80,7 @@ export const InvoicePage: React.FC = () => {
               format(new Date(row.date), 'dd.MM.yyyy HH:mm'),
               row.gasMixture,
               row.description,
-              formatEurCentsToEur(row.price),
+              eurCentsToEur(row.price),
             ]),
           };
         }) ?? [],
@@ -101,11 +101,11 @@ export const InvoicePage: React.FC = () => {
           .map((invoice) => ({
             Nimi: `${invoice.user.surname} ${invoice.user.forename}`,
             Yhteystiedot: invoice.user.email,
-            'Hinta (€)': formatEurCentsToEur(invoice.invoiceTotal),
+            'Hinta (€)': eurCentsToEur(invoice.invoiceTotal),
             Tapahtumat: invoice.invoiceRows
               .map(
                 (row) =>
-                  `${format(new Date(row.date), 'dd.MM.yyyy HH:mm')} ${row.gasMixture} ${row.description} ${formatEurCentsToEur(row.price)} €`,
+                  `${format(new Date(row.date), 'dd.MM.yyyy HH:mm')} ${row.gasMixture} ${row.description} ${eurCentsToEur(row.price)} €`,
               )
               .join(', '),
           })),

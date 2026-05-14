@@ -17,6 +17,7 @@
     "db:seed:make": "knex seed:make"
   },
   "dependencies": {
+    "@tayttopaikka/pricing": "workspace:*",
     "@fastify/autoload": "^6.3.1",
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",

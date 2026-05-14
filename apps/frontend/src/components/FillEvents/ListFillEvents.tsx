@@ -1,12 +1,12 @@
 import { compareDesc, format } from 'date-fns';
 import { useFillEventQuery } from '../../lib/queries/FillEventQuery';
-import { formatEurCentsToEur } from '../../lib/utils';
 import {
   CommonTable,
   type TableColumn,
   type TableRow,
 } from '../common/Table/CommonTable';
 import { useMemo, type JSX } from 'react';
+import { eurCentsToEur } from '@tayttopaikka/pricing';
 
 const FILL_EVENT_COLUMNS: TableColumn[] = [
   {
@@ -52,7 +52,7 @@ export const ListFillEvents = (): JSX.Element => {
             fillEvent.gasMixture,
             fillEvent.compressorName ?? '',
             fillEvent.description,
-            formatEurCentsToEur(fillEvent.price),
+            eurCentsToEur(fillEvent.price),
           ],
         })) ?? [],
     [fillEvents],
@@ -63,7 +63,7 @@ export const ListFillEvents = (): JSX.Element => {
         <h1>Täyttöhistoria</h1>
         <h2>
           Täyttöjen hinta yhteensä:{' '}
-          {formatEurCentsToEur(
+          {eurCentsToEur(
             fillEvents?.reduce((acc, fillEvent) => acc + fillEvent.price, 0) ??
               0,
           )}{' '}
