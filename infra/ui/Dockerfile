@@ -15,7 +15,7 @@ COPY apps/frontend ./apps/frontend
 
 # Install dependencies and build
 RUN pnpm install --frozen-lockfile --filter @tayttopaikka/frontend...
-RUN pnpm --filter @tayttopaikka/frontend build
+RUN pnpm exec turbo --filter @tayttopaikka/frontend build
 
 # Serve app with nginx
 FROM nginx:1.25.1
