@@ -25,6 +25,7 @@
     "@fastify/swagger-ui": "^5.2.5",
     "@fastify/type-provider-typebox": "^6.1.0",
     "@scaleway/sdk": "^3.4.5",
+    "@sentry/node": "^10.53.1",
     "@sinclair/typebox": "^0.34.49",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.2",

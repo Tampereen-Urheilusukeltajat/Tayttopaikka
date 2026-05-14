@@ -1,9 +1,14 @@
+import './instrument.mjs';
+
 // Disable import first to allow dotenv configuration to happen before any imports
 /* eslint-disable import/first */
 import * as dotenv from 'dotenv';
 dotenv.config({
   quiet: true,
 });
+
+import * as Sentry from '@sentry/node';
+
 
 import { knexController } from './database/database';
 import { redisClient } from './lib/auth/redis';
@@ -28,6 +33,7 @@ void (async () => {
     await knexController.migrate.latest();
   } catch (error) {
     log.error('Error running migrations!', error);
+    Sentry.captureException(error);
     process.exit(1);
   }
 
@@ -36,6 +42,7 @@ void (async () => {
     await redisClient.connect();
   } catch (error) {
     log.error('Error connecting redis!', error);
+    Sentry.captureException(error);
     process.exit(1);
   }
 
@@ -44,12 +51,16 @@ void (async () => {
     const server = await buildServer({
       routePrefix: ROUTE_PREFIX,
     });
+
+    Sentry.setupFastifyErrorHandler(server);
+
     await server.listen({
       host: APPLICATION_HOST,
       port: APPLICATION_PORT,
     });
   } catch (error) {
     log.error('Error starting server!', error);
+    Sentry.captureException(error);
     process.exit(1);
   }
 
@@ -58,6 +69,7 @@ void (async () => {
     initializeScheduler();
   } catch (error) {
     log.error('Error initializing scheduler!', error);
+    Sentry.captureException(error);
     // Don't exit - server can still run without scheduler
   }
 
