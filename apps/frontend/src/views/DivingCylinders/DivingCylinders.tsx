@@ -30,6 +30,7 @@ export const DivingCylinders = (): JSX.Element => {
   );
   const { mutate: patchCylinder } = usePatchDivingCylinderSet(userId, refetch);
 
+  // Incrementing the key forces NewDivingCylinderSet to remount, resetting the form.
   const [createKey, setCreateKey] = useState(0);
   const { mutate: createCylinder } = useCreateDivingCylinderSet(userId, () => {
     refetch();

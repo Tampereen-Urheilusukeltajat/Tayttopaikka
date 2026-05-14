@@ -23,6 +23,7 @@ export const ClubCylinders = (): JSX.Element => {
   const { mutate: archiveCylinder } = useArchiveClubCylinderSetMutation(refetch);
   const { mutate: patchCylinder } = usePatchClubCylinderSet(refetch);
 
+  // Incrementing the key forces NewClubCylinderSet to remount, resetting the form.
   const [createKey, setCreateKey] = useState(0);
   const { mutate: createCylinder } = useCreateClubCylinderSet(() => {
     refetch();
