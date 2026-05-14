@@ -8,6 +8,7 @@ import * as Sentry from "@sentry/react";
 
 Sentry.init({
   dsn: "https://9acf76e6b4d4bc9f51669d6366cf1307@o4511298353496064.ingest.de.sentry.io/4511387097104464",
+  enabled: !import.meta.env.DEV,
   sendDefaultPii: true,
 });
 
