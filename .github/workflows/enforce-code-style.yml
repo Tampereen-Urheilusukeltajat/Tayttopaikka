@@ -22,6 +22,9 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build pricing package
+        run: pnpm exec turbo --filter @tayttopaikka/pricing build
       - name: Run linters
         run: pnpm run lint
       - name: Check types
