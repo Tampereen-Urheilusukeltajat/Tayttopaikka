@@ -36,6 +36,9 @@ const BaseElement: React.FC = () => (
   </div>
 );
 
+
+
+
 const Content: React.FC = () => {
   // @TODO: We need to do spinner thing better
   const isFetching = useIsFetching();
@@ -99,6 +102,13 @@ const Content: React.FC = () => {
 const App = (): JSX.Element => {
   return (
     <QueryClientProvider client={QUERY_CLIENT}>
+      <button
+        onClick={() => {
+          throw new Error('This is your first error!');
+        }}
+      >
+        Break the world
+      </button>
       <ToastContainer className="toast-position" position={'top-right'} />
       <Content />
     </QueryClientProvider>
