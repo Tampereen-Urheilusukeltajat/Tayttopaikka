@@ -30,3 +30,6 @@ pnpm-debug.log*
 *.css.map
 
 .env
+
+# Sentry Config File
+.env.sentry-build-plugin
