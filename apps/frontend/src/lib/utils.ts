@@ -97,7 +97,9 @@ export const getTokenFromLocalStorage = <Payload>(
   // Valid tokens always have three parts
   if (splittedToken.length !== 3) return undefined;
 
-  const payload: Payload = JSON.parse(window.atob(splittedToken[1]));
+  const base64 = splittedToken[1].replace(/-/g, '+').replace(/_/g, '/');
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const payload: Payload = JSON.parse(new TextDecoder().decode(bytes));
 
   return {
     token,
