@@ -69,7 +69,6 @@ export const mapGasToName = (gas?: AvailableGasses): string => {
   }
 };
 
-
 export const tokenExpired = (exp: number): boolean =>
   // Date now gives timestamp in ms, token has seconds
   Math.floor(Date.now() / 1000) > exp;
