@@ -1,182 +1,35 @@
-import { FieldArray, type FieldArrayRenderProps, Formik, Form } from 'formik';
-import React, { useCallback, useMemo } from 'react';
-import { BsTrash } from 'react-icons/bs';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { DIVING_CYLINDER_SETS_QUERY_KEY } from '../../lib/queries/queryKeys';
+import { FieldArray, Formik, Form } from 'formik';
+import React, { useCallback } from 'react';
+import { PrimaryButton } from '../common/Button/Buttons';
+import { ButtonType } from '../common/Button/Buttons';
+import { NEW_CYLINDER_SET_VALIDATION_SCHEMA } from '../CylinderSet/validation';
+import { TextInput } from '../common/Inputs';
+import styles from '../CylinderSet/NewCylinderSet.module.scss';
 import {
-  type DivingCylinderSetPostRequest,
-  type DivingCylinderSetTable,
-  postDivingCylinderSet,
-} from '../../lib/apiRequests/divingCylinderSetRequests';
-import {
-  type DivingCylinder,
-  type DivingCylinderSet,
-} from '../../interfaces/DivingCylinderSet';
-import {
-  ButtonType,
-  ElementButton,
-  PrimaryButton,
-} from '../common/Button/Buttons';
-import { getUserIdFromAccessToken } from '../../lib/utils';
-import { toast } from 'react-toastify';
-import { NEW_CYLINDER_SET_VALIDATION_SCHEMA } from './validation';
-import { TextInput, DropdownMenu } from '../common/Inputs';
-import styles from './NewDivingCylinderSet.module.scss';
+  type CylinderSetCreatePayload,
+  type CylinderSetFormValues,
+  emptyDivingCylinder,
+  NewCylinderRow,
+} from '../CylinderSet/NewCylinderRow';
 
-type FormDivingCylinder = Omit<DivingCylinder, 'id'> & { uniqueId: string };
-
-const EmptyDivingCylinder = (
-  material = 'steel',
-  pressure = 0,
-  inspection = '',
-  volume = 0,
-): FormDivingCylinder => ({
-  material,
-  pressure,
-  inspection,
-  serialNumber: '',
-  uniqueId: crypto.randomUUID(),
-  volume,
-});
-
-type NewDivingCylinderRowProps = {
-  fieldProps: FieldArrayRenderProps;
-  index: number;
-  lastItem: boolean;
-  errors: any;
-  firstCylinder?: Omit<DivingCylinder, 'id'>;
+type NewDivingCylinderSetProps = {
+  onSubmit: (payload: CylinderSetCreatePayload) => void;
 };
 
-const NewDivingCylinderRow: React.FC<NewDivingCylinderRowProps> = ({
-  fieldProps,
-  index,
-  errors,
-  lastItem,
-  firstCylinder,
+export const NewDivingCylinderSet: React.FC<NewDivingCylinderSetProps> = ({
+  onSubmit,
 }) => {
-  const { replace, remove, push } = fieldProps;
-  return (
-    <div>
-      <div className={styles.cylinder}>
-        <div className={styles.deleteButtonWrapper}>
-          <ElementButton
-            tooltip="Poista pullo"
-            element={<BsTrash />}
-            onClick={() => {
-              lastItem && index === 0
-                ? replace(index, { ...EmptyDivingCylinder() })
-                : remove(index);
-            }}
-          />
-        </div>
-
-        <TextInput
-          label="Tilavuus"
-          name={`divingCylinders.${index}.volume`}
-          type="number"
-          errorText={errors.divingCylinders?.at(index)?.volume}
-          unit="l"
-        />
-        <DropdownMenu
-          label="Materiaali"
-          name={`divingCylinders.${index}.material`}
-          errorText={errors.divingCylinders?.at(index)?.material}
-        >
-          <option value="steel">Teräs</option>
-          <option value="aluminium">Alumiini</option>
-          <option value="carbonFiber">Hiilikuitu</option>
-        </DropdownMenu>
-        <TextInput
-          label="Suurin sallittu paine"
-          name={`divingCylinders.${index}.pressure`}
-          type="number"
-          errorText={errors.divingCylinders?.at(index)?.pressure}
-          unit="bar"
-        />
-        <TextInput
-          label="Sarjanumero"
-          name={`divingCylinders.${index}.serialNumber`}
-          type="string"
-          errorText={errors.divingCylinders?.at(index)?.serialNumber}
-        />
-        <TextInput
-          label="Katsastusvuosi"
-          name={`divingCylinders.${index}.inspection`}
-          type="number"
-          errorText={errors.divingCylinders?.at(index)?.inspection}
-        />
-      </div>
-      {lastItem ? (
-        <ElementButton
-          onClick={() => {
-            push({
-              ...EmptyDivingCylinder(
-                firstCylinder?.material,
-                firstCylinder?.pressure,
-                firstCylinder?.inspection,
-                firstCylinder?.volume,
-              ),
-            });
-          }}
-          className='w-100'
-          type={ButtonType.button}
-          element={<>Lisää pullo</>}
-        />
-      ) : null}
-    </div>
-  );
-};
-
-export const NewDivingCylinderSet: React.FC = () => {
-  const userId = useMemo(() => getUserIdFromAccessToken(), []);
-
-  const queryClient = useQueryClient();
-  const cylinderSetMutation = useMutation({
-    mutationFn: async (payload: DivingCylinderSetPostRequest) =>
-      postDivingCylinderSet(payload),
-    onSuccess: (cylinderSet) => {
-      const cylinderSets = queryClient.getQueryData<DivingCylinderSet[]>(
-        DIVING_CYLINDER_SETS_QUERY_KEY(userId),
-      );
-
-      queryClient.setQueryData(DIVING_CYLINDER_SETS_QUERY_KEY(userId), [
-        ...(cylinderSets ?? []),
-        cylinderSet,
-      ]);
-      toast.success('Uusi pullosetti lisätty!');
-    },
-    onError: () => {
-      toast.error(
-        'Uuden pullosetin luominen epäonnistui. Tarkista tiedot ja yritä uudelleen.',
-      );
-    },
-  });
-
-  const resetForm = useCallback((values: DivingCylinderSetTable): void => {
-    values.divingCylinderSetName = '';
-    values.divingCylinders = [{ ...EmptyDivingCylinder() }];
-  }, []);
-
   const handleFormSubmit = useCallback(
-    async (values: DivingCylinderSetTable) => {
-      // Set isError to false because it does not reset between submits
-      cylinderSetMutation.isError = false;
-      await cylinderSetMutation.mutateAsync({
-        owner: getUserIdFromAccessToken(),
+    (values: CylinderSetFormValues) => {
+      onSubmit({
         name: values.divingCylinderSetName,
-        cylinders: values.divingCylinders.map((dc) => ({
-          inspection: dc.inspection,
-          material: dc.material,
-          pressure: dc.pressure,
-          serialNumber: dc.serialNumber,
-          volume: dc.volume,
-        })),
+        cylinders: values.divingCylinders.map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          ({ uniqueId: _id, ...dc }) => dc,
+        ),
       });
-      if (!cylinderSetMutation.isError) {
-        resetForm(values);
-      }
     },
-    [cylinderSetMutation, resetForm],
+    [onSubmit],
   );
 
   return (
@@ -185,13 +38,12 @@ export const NewDivingCylinderSet: React.FC = () => {
       <Formik
         initialValues={{
           divingCylinderSetName: '',
-          divingCylinders: [{ ...EmptyDivingCylinder() }],
+          divingCylinders: [{ ...emptyDivingCylinder() }],
         }}
         validateOnChange={false}
         validateOnBlur={false}
         validationSchema={NEW_CYLINDER_SET_VALIDATION_SCHEMA}
         onSubmit={handleFormSubmit}
-        handleReset={resetForm}
       >
         {({ values, errors, isSubmitting }) => (
           <Form className={styles.form}>
@@ -206,7 +58,7 @@ export const NewDivingCylinderSet: React.FC = () => {
             <FieldArray name="divingCylinders">
               {(arrayHelpers) =>
                 values.divingCylinders.map((dc, index) => (
-                  <NewDivingCylinderRow
+                  <NewCylinderRow
                     key={dc.uniqueId}
                     errors={errors}
                     fieldProps={arrayHelpers}

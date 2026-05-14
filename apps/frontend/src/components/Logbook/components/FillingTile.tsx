@@ -20,11 +20,14 @@ export const LogbookFillingTile: React.FC<AirLogbookFillingTileProps> = ({
 }) => {
   const [showClubCylinders, setShowClubCylinders] = useState(false);
 
+  const orderedCylinderSets = divingCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
   return (
     <div className="pt-3 pb-3 border-bottom">
       <div className="d-flex justify-content-between align-items-center mb-2">
         <h2 className="mb-0">Täytetyt pullosetit</h2>
-        {clubCylinderSets.length > 0 && (
+        {orderedClubCylinderSets.length > 0 && (
           <Form.Check
             type="switch"
             id="show-club-cylinders"
@@ -47,7 +50,7 @@ export const LogbookFillingTile: React.FC<AirLogbookFillingTileProps> = ({
         >
           <h3>Omat pullot</h3>
           <div className="d-flex flex-column gap-2">
-            {divingCylinderSets.map((dcs) => (
+            {orderedCylinderSets.map((dcs) => (
               <FormCheck key={dcs.id} className={styles.cylinderCheckbox}>
                 <Field
                   className="form-check-input"

@@ -1,67 +1,32 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { useDivingCylinderQuery } from '../../lib/queries/divingCylinderQuery';
-import { DIVING_CYLINDER_SETS_QUERY_KEY } from '../../lib/queries/queryKeys';
-import { getUserIdFromAccessToken } from '../../lib/utils';
-
 import { CommonTableV2 } from '../common/Table/CommonTable-v2';
 import {
-  createColumnHelper,
   getCoreRowModel,
   getExpandedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { format } from 'date-fns';
-import { BsPencil, BsTrash } from 'react-icons/bs';
-import { useArchieveDivingCylinderSetMutation } from '../../lib/queries/divingCylinderSetMutation';
 import { useCallback, useMemo, useState, type JSX } from 'react';
 import { Modal } from '../common/Modal/Modal';
 import { toast } from 'react-toastify';
 import { type DivingCylinderSet } from '../../interfaces/DivingCylinderSet';
 import { ModifyDivingCylinderSetModal } from './ModifyDivingCylinderSetModal';
-import { Tooltip } from 'react-tooltip';
+import {
+  buildCylinderTableColumns,
+  buildCylinderTableRows,
+} from '../CylinderSet/CylinderSetTable';
 
-type DivingCylinderTableRow = {
-  id: string;
-  name?: string;
-  volume?: number;
-  material?: string;
-  maxPressure?: number;
-  serialNumber?: string;
-  lastInspection?: string;
-  cylinders?: DivingCylinderTableRow[];
+type DivingCylinderSetListProps = {
+  cylinderSets: DivingCylinderSet[];
+  onArchive: (id: string) => void;
+  onPatch: (args: { divingCylinderSetId: string; payload: { name?: string; cylinders?: Array<{ id: string; inspection?: string }> } }) => void;
+  userId: string;
 };
 
-const columnHelper = createColumnHelper<DivingCylinderTableRow>();
-
-export enum DivingCylinderMaterials {
-  steel = 'steel',
-  aluminium = 'aluminium',
-  carbonFiber = 'carbonFiber',
-}
-
-const DCMaterialFiTranslation = (enMaterial: string): string => {
-  switch (enMaterial) {
-    case DivingCylinderMaterials.aluminium:
-      return 'Alumiini';
-    case DivingCylinderMaterials.carbonFiber:
-      return 'Hiilikuitu';
-    case DivingCylinderMaterials.steel:
-      return 'Teräs';
-    default:
-      return enMaterial;
-  }
-};
-
-export const DivingCylinderSetList = (): JSX.Element => {
-  const userId = useMemo(() => getUserIdFromAccessToken(), []);
-  const queryClient = useQueryClient();
-  const { data: divingCylinderSets } = useDivingCylinderQuery(userId);
-  const { mutate: archiveDivingCylinder } =
-    useArchieveDivingCylinderSetMutation(userId, () => {
-      void queryClient.refetchQueries({
-        queryKey: DIVING_CYLINDER_SETS_QUERY_KEY(userId),
-      });
-    });
+export const DivingCylinderSetList = ({
+  cylinderSets,
+  onArchive,
+  onPatch,
+  userId,
+}: DivingCylinderSetListProps): JSX.Element => {
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [toBeArchivedDivingCylinderSetId, setToBeArchivedDivingCylinderSetId] =
@@ -72,103 +37,24 @@ export const DivingCylinderSetList = (): JSX.Element => {
     DivingCylinderSet | undefined
   >(undefined);
 
-  const tableCylinders: DivingCylinderTableRow[] = useMemo(
-    () =>
-      divingCylinderSets?.map((dcs) => ({
-        id: dcs.id,
-        lastInspection: undefined,
-        cylinders: dcs.cylinders.map((dc) => ({
-          id: dc.id,
-          cylinders: [],
-          name: undefined,
-          volume: dc.volume,
-          material: DCMaterialFiTranslation(dc.material),
-          maxPressure: dc.pressure,
-          serialNumber: dc.serialNumber,
-          lastInspection: format(dc.inspection, 'yyyy'),
-        })),
-        name: dcs.name,
-        volume: dcs.cylinders.reduce((acc, dc) => acc + dc.volume, 0),
-        material: undefined,
-        maxPressure: undefined,
-        serialNumber: undefined,
-      })) ?? [],
-    [divingCylinderSets],
+  const tableCylinders = useMemo(
+    () => buildCylinderTableRows(cylinderSets),
+    [cylinderSets],
   );
 
   const tableColumns = useMemo(
-    () => [
-      columnHelper.accessor('id', {
-        id: 'id',
-      }),
-      columnHelper.accessor('name', {
-        id: 'name',
-        header: 'Nimi',
-      }),
-      columnHelper.accessor('volume', {
-        id: 'size',
-        header: 'Koko (l)',
-      }),
-      columnHelper.accessor('material', {
-        id: 'material',
-        header: 'Materiaali',
-      }),
-      columnHelper.accessor('maxPressure', {
-        id: 'maxPressure',
-        header: 'Maksimipaine (bar)',
-      }),
-      columnHelper.accessor('serialNumber', {
-        id: 'serialNumber',
-        header: 'Sarjanumero',
-      }),
-      columnHelper.accessor('lastInspection', {
-        id: 'lastInspection',
-        header: 'Katsastusvuosi',
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: 'Toiminnot',
-        cell: (cell) => {
-          const isSubRow = cell.row.depth > 0;
-          if (isSubRow) return null;
-
-          const rowId = cell.row.id;
-          return (
-            <div className="d-flex justify-content-center gap-2 py-1">
-              <button
-                data-tooltip-id={`modify-set-${rowId}`}
-                data-tooltip-content={'Muokkaa pullosettiä'}
-                className="btn btn-primary"
-                onClick={() => {
-                  setModifiedCylinderSet(
-                    divingCylinderSets?.find(
-                      (dcs) => dcs.id === cell.row.getValue('id'),
-                    ),
-                  );
-                  setShowModifyModal(true);
-                }}
-              >
-                <BsPencil />
-              </button>
-              <button
-                data-tooltip-id={`delete-set-${rowId}`}
-                data-tooltip-content={'Poista pullosetti'}
-                className="btn btn-danger"
-                onClick={() => {
-                  setToBeArchivedDivingCylinderSetId(cell.row.getValue('id'));
-                  setConfirmModalOpen(true);
-                }}
-              >
-                <BsTrash />
-              </button>
-              <Tooltip id={`modify-set-${rowId}`} />
-              <Tooltip id={`delete-set-${rowId}`} />
-            </div>
-          );
+    () =>
+      buildCylinderTableColumns({
+        onEdit: (id) => {
+          setModifiedCylinderSet(cylinderSets.find((dcs) => dcs.id === id));
+          setShowModifyModal(true);
+        },
+        onDelete: (id) => {
+          setToBeArchivedDivingCylinderSetId(id);
+          setConfirmModalOpen(true);
         },
       }),
-    ],
-    [divingCylinderSets],
+    [cylinderSets],
   );
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -192,10 +78,10 @@ export const DivingCylinderSetList = (): JSX.Element => {
         'Jotain meni pieleen. Lataa sivu uudelleen ja yritä uudestaan',
       );
     }
-    archiveDivingCylinder(toBeArchivedDivingCylinderSetId);
+    onArchive(toBeArchivedDivingCylinderSetId);
     setToBeArchivedDivingCylinderSetId(undefined);
     setConfirmModalOpen(false);
-  }, [archiveDivingCylinder, toBeArchivedDivingCylinderSetId]);
+  }, [onArchive, toBeArchivedDivingCylinderSetId]);
 
   return (
     <div>
@@ -221,6 +107,7 @@ export const DivingCylinderSetList = (): JSX.Element => {
           }}
           showModifyDivingCylinderModal={showModifyModal}
           divingCylinderSet={modifiedCylinderSet}
+          onPatch={onPatch}
           userId={userId}
         />
       )}
