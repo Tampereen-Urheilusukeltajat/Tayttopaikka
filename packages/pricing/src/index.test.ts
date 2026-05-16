@@ -57,7 +57,7 @@ describe('calcDiluentFillCostCents', () => {
   test('40% He, 100L, 6 c/L = 240 cents', () =>
     assert.strictEqual(calcDiluentFillCostCents(100, 40, 6), 240));
 
-  test('33% He, 100L, 6 c/L = ceil(198) = 198 cents', () =>
+  test('33% He, 100L, 6 c/L = 198 cents', () =>
     assert.strictEqual(calcDiluentFillCostCents(100, 33, 6), 198));
 
   test('ceil applied: 1% He, 1L, 1 c/L = ceil(0.01) = 1', () =>
@@ -83,9 +83,9 @@ describe('calcTotalFillCostCents', () => {
   test('gas and diluent combined', () =>
     assert.strictEqual(calcTotalFillCostCents([60], [240]), 300));
 
-  test('original bug: two O2 tanks at 0.9 c/L produce correct integer total', () => {
-    // Before the fix, the frontend converted each row to EUR and back, losing precision.
-    // 650L × 0.9 = 585, 300L × 0.9 = 270, total = 855 cents (integer).
+  test('two gas fills at 0.9 c/L produce correct integer total', () => {
+    // 650L × 0.9 = 585 cents, 300L × 0.9 = 270 cents, total = 855 cents.
+    // Both individual products are exact integers, so the sum must be too.
     const tank1 = calcGasFillCostCents(calculateVolumeLitres(50, 196, 183), 0.9);
     const tank2 = calcGasFillCostCents(calculateVolumeLitres(50, 34, 28), 0.9);
     assert.strictEqual(calcTotalFillCostCents([tank1, tank2], []), 855);
@@ -93,8 +93,8 @@ describe('calcTotalFillCostCents', () => {
 
   test('ceil applied to the combined sum, not per-row individually', () => {
     // 19L × 0.9 c/L = 17.1 cents per row. Two such rows:
-    // Sum-then-ceil: ceil(34.2) = 35 cents ← correct
-    // Ceil-each-then-sum: ceil(17.1) + ceil(17.1) = 18 + 18 = 36 cents ← wrong
+    // Correct:   ceil(17.1 + 17.1) = ceil(34.2) = 35 cents
+    // Incorrect: ceil(17.1) + ceil(17.1) = 18 + 18 = 36 cents
     assert.strictEqual(calcTotalFillCostCents([17.1, 17.1], []), 35);
   });
 

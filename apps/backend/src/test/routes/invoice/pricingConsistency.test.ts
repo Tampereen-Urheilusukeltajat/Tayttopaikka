@@ -210,18 +210,18 @@ describe('Pricing consistency: library vs SQL', () => {
     const invoice = await getInvoice();
     const rowById = Object.fromEntries(invoice.invoiceRows.map((r) => [r.id, r.price]));
 
-    assert.strictEqual(rowById[id1], price1, 'row 1 price should match library');
-    assert.strictEqual(rowById[id2], price2, 'row 2 price should match library');
+    assert.strictEqual(rowById[id1], price1, 'row 1 price should be 60 cents');
+    assert.strictEqual(rowById[id2], price2, 'row 2 price should be 240 cents');
 
     const sumOfRows = invoice.invoiceRows.reduce((s, r) => s + r.price, 0);
     assert.strictEqual(invoice.invoiceTotal, sumOfRows, 'total must equal sum of row prices');
     assert.strictEqual(invoice.invoiceTotal, price1 + price2);
   });
 
-  test('invoiceTotal equals sum of row prices with fractional-cent gas prices (original bug scenario)', async () => {
-    // O2 at 0.9 c/L (= 0.009 €/L) — the price that triggered the original bug.
-    // With FLOAT storage in MariaDB, volume × 0.9 is not always exactly integer.
-    // CEIL must be applied per-event; otherwise the invoice total and row sum diverge.
+  test('invoiceTotal equals sum of row prices with fractional-cent gas prices', async () => {
+    // MariaDB stores gas prices as FLOAT(6,2). At 0.9 c/L, SQL float arithmetic gives
+    // 100 × 0.60000002... = 60.000002..., so CEIL returns 61 instead of 60 unless the
+    // price is cast to DECIMAL first. This test verifies the CAST is in place.
     await getTestKnex()('gas_price')
       .where('id', O2_GAS_PRICE_ID)
       .update({ price_eur_cents: O2_PRICE_FRACTIONAL });
