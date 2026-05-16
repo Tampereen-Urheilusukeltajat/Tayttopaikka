@@ -52,3 +52,20 @@ export const calcTotalFillCostCents = (
     gasCostsCents.reduce((a, b) => a + b, 0) +
       diluentCostsCents.reduce((a, b) => a + b, 0),
   );
+
+/**
+ * Sum of prices for events that occurred after the last completed payment.
+ * If no completed payment exists, returns the sum of all event prices.
+ */
+export const computeOpenBalance = (
+  events: { price: number; createdAt: string }[],
+  lastCompletedPaymentAt: string | undefined,
+): number => {
+  if (!lastCompletedPaymentAt) {
+    return events.reduce((sum, e) => sum + e.price, 0);
+  }
+  const cutoff = new Date(lastCompletedPaymentAt);
+  return events
+    .filter((e) => new Date(e.createdAt) > cutoff)
+    .reduce((sum, e) => sum + e.price, 0);
+};

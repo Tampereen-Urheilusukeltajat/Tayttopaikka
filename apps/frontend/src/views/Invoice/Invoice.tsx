@@ -1,9 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  CommonTable,
-  type TableRow,
-  type TableColumn,
-} from '../../components/common/Table/CommonTable';
+  createColumnHelper,
+  getCoreRowModel,
+  getExpandedRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { CommonTableV2 } from '../../components/common/Table/CommonTable-v2';
 import { type Invoice, useInvoiceQuery } from '../../lib/queries/invoiceQuery';
 import { format } from 'date-fns';
 import { PrimaryButton } from '../../components/common/Button/Buttons';
@@ -13,31 +15,43 @@ import { toast } from 'react-toastify';
 import { useInvoicePaymentEventsMutation } from '../../lib/queries/invoicePaymentEventMutation';
 import { eurCentsToEur } from '@tayttopaikka/pricing';
 
-const INVOICE_COLUMNS: TableColumn[] = [
-  {
-    title: 'Nimi',
-    shortTitle: 'Nimi',
-  },
-  {
-    title: 'Yhteystiedot',
-    shortTitle: '@',
-  },
-  {
-    title: 'Päivämäärä',
-    shortTitle: 'Pvm',
-  },
-  {
-    title: 'Kaasuseos',
-    shortTitle: 'Mix',
-  },
-  {
-    title: 'Kuvaus',
-    shortTitle: 'Kuv.',
-  },
-  {
-    title: 'Hinta (€)',
-    shortTitle: '€',
-  },
+type InvoiceTableRow = {
+  name: string | null;
+  email: string | null;
+  date: string | null;
+  gasMixture: string | null;
+  description: string | null;
+  priceEurCents: number;
+  subRows?: InvoiceTableRow[];
+};
+
+const columnHelper = createColumnHelper<InvoiceTableRow>();
+
+const columns = [
+  columnHelper.accessor('name', {
+    header: 'Nimi',
+    cell: (info) => info.getValue() ?? '',
+  }),
+  columnHelper.accessor('email', {
+    header: 'Yhteystiedot',
+    cell: (info) => info.getValue() ?? '',
+  }),
+  columnHelper.accessor('date', {
+    header: 'Päivämäärä',
+    cell: (info) => info.getValue() ?? '',
+  }),
+  columnHelper.accessor('gasMixture', {
+    header: 'Kaasuseos',
+    cell: (info) => info.getValue() ?? '',
+  }),
+  columnHelper.accessor('description', {
+    header: 'Kuvaus',
+    cell: (info) => info.getValue() ?? '',
+  }),
+  columnHelper.accessor('priceEurCents', {
+    header: 'Hinta (€)',
+    cell: (info) => `${eurCentsToEur(info.getValue())} €`,
+  }),
 ];
 
 export const InvoicePage: React.FC = () => {
@@ -54,7 +68,7 @@ export const InvoicePage: React.FC = () => {
   const { mutate: createInvoicePaymentEvents } =
     useInvoicePaymentEventsMutation(onMutationSuccess);
 
-  const rows: TableRow[] = useMemo(
+  const tableData = useMemo(
     () =>
       data
         ?.slice()
@@ -63,29 +77,34 @@ export const InvoicePage: React.FC = () => {
             `${b.user.surname} ${b.user.forename}`,
           ),
         )
-        .map((invoice) => {
-          return {
-            id: invoice.user.id,
-            mainRow: [
-              `${invoice.user.surname}, ${invoice.user.forename}`,
-              invoice.user.email,
-              null,
-              null,
-              null,
-              eurCentsToEur(invoice.invoiceTotal),
-            ],
-            childRows: invoice.invoiceRows.map((row) => [
-              null,
-              null,
-              format(new Date(row.date), 'dd.MM.yyyy HH:mm'),
-              row.gasMixture,
-              row.description,
-              eurCentsToEur(row.price),
-            ]),
-          };
-        }) ?? [],
+        .map((invoice) => ({
+          name: `${invoice.user.surname}, ${invoice.user.forename}`,
+          email: invoice.user.email,
+          date: null,
+          gasMixture: null,
+          description: null,
+          priceEurCents: invoice.invoiceTotal,
+          subRows: invoice.invoiceRows.map((row) => ({
+            name: null,
+            email: null,
+            date: format(new Date(row.date), 'dd.MM.yyyy HH:mm'),
+            gasMixture: row.gasMixture,
+            description: row.description,
+            priceEurCents: row.price,
+          })),
+        })) ?? [],
     [data],
   );
+
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table v8 is not React Compiler-compatible; memoization is handled manually above
+  const table = useReactTable({
+    columns,
+    data: tableData,
+    getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getSubRows: (row) => row.subRows,
+    initialState: { expanded: true },
+  });
 
   const onExportInvoicesButtonClick = useCallback(() => {
     if (data) {
@@ -212,7 +231,7 @@ export const InvoicePage: React.FC = () => {
             />
           </div>
         </div>
-        <CommonTable columns={INVOICE_COLUMNS} rows={rows} />
+        <CommonTableV2 table={table} />
       </div>
     </div>
   );
