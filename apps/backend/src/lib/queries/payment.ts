@@ -237,3 +237,31 @@ export const getPaymentEventsWithIds = async (
 
   return paymentEvents;
 };
+
+/**
+ * Get all payment events for a user, ordered newest first
+ * @param userId
+ */
+export const getPaymentEventsForUser = async (
+  userId: string,
+): Promise<PaymentEvent[]> => {
+  const [paymentEvents] = await knexController.raw<DBResponse<PaymentEvent[]>>(
+    `
+    SELECT
+      id,
+      user_id AS userId,
+      status,
+      created_at AS createdAt,
+      updated_at AS updatedAt,
+      total_amount_eur_cents AS totalAmountEurCents
+    FROM payment_event
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+  `,
+    [userId],
+  );
+
+  if (!paymentEvents || paymentEvents.length === 0) return [];
+
+  return paymentEvents;
+};

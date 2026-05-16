@@ -1,76 +1,58 @@
 import { compareDesc, format } from 'date-fns';
 import { useFillEventQuery } from '../../lib/queries/FillEventQuery';
+import { CommonTableV2 } from '../common/Table/CommonTable-v2';
 import {
-  CommonTable,
-  type TableColumn,
-  type TableRow,
-} from '../common/Table/CommonTable';
+  createColumnHelper,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
 import { useMemo, type JSX } from 'react';
 import { eurCentsToEur } from '@tayttopaikka/pricing';
+import { FillEventStats } from './FillEventStats';
+import { type FillEvent } from '../../interfaces/FillEvent';
 
-const FILL_EVENT_COLUMNS: TableColumn[] = [
-  {
-    title: 'Päivämäärä',
-    shortTitle: 'Pvm',
-  },
-  {
-    title: 'Pullosetti',
-    shortTitle: 'PS',
-  },
-  {
-    title: 'Kaasuseos',
-    shortTitle: 'KS',
-  },
-  {
-    title: 'Kompressori',
-    shortTitle: 'K',
-  },
-  {
-    title: 'Lisätiedot',
-    shortTitle: 'LT',
-  },
-  {
-    title: 'Hinta (€)',
-    shortTitle: '€',
-  },
+const columnHelper = createColumnHelper<FillEvent>();
+
+const columns = [
+  columnHelper.accessor('createdAt', {
+    header: 'Päivämäärä',
+    cell: (info) => format(new Date(info.getValue()), 'dd.MM.yy HH:mm'),
+  }),
+  columnHelper.accessor('cylinderSetName', { header: 'Pullosetti' }),
+  columnHelper.accessor('gasMixture', { header: 'Kaasuseos' }),
+  columnHelper.accessor('compressorName', {
+    header: 'Kompressori',
+    cell: (info) => info.getValue() ?? '',
+  }),
+  columnHelper.accessor('description', { header: 'Lisätiedot' }),
+  columnHelper.accessor('price', {
+    header: 'Hinta (€)',
+    cell: (info) => `${eurCentsToEur(info.getValue())} €`,
+  }),
 ];
-
-const dateFormatter = (date: string): string =>
-  format(new Date(date), 'dd.MM.yy HH:mm');
 
 export const ListFillEvents = (): JSX.Element => {
   const { data: fillEvents } = useFillEventQuery();
-  const rows: TableRow[] = useMemo(
+  const sortedFillEvents = useMemo(
     () =>
       fillEvents
-        ?.sort((a, b) => compareDesc(a.createdAt, b.createdAt))
-        .map((fillEvent) => ({
-          id: fillEvent.id,
-          mainRow: [
-            dateFormatter(fillEvent.createdAt),
-            fillEvent.cylinderSetName,
-            fillEvent.gasMixture,
-            fillEvent.compressorName ?? '',
-            fillEvent.description,
-            eurCentsToEur(fillEvent.price),
-          ],
-        })) ?? [],
+        ?.slice()
+        .sort((a, b) => compareDesc(a.createdAt, b.createdAt)) ?? [],
     [fillEvents],
   );
+
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table v8 is not React Compiler-compatible; memoization is handled manually above
+  const table = useReactTable({
+    columns,
+    data: sortedFillEvents,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
   return (
     <div>
-      <div className="d-flex flex-row justify-content-between pb-4">
-        <h1>Täyttöhistoria</h1>
-        <h2>
-          Täyttöjen hinta yhteensä:{' '}
-          {eurCentsToEur(
-            fillEvents?.reduce((acc, fillEvent) => acc + fillEvent.price, 0) ??
-              0,
-          )}{' '}
-          €
-        </h2>
-      </div>
-      <CommonTable columns={FILL_EVENT_COLUMNS} rows={rows} />
+      <h1 className="pb-4">Täyttöhistoria</h1>
+      <FillEventStats fillEvents={fillEvents ?? []} />
+      <CommonTableV2 table={table} />
     </div>
   );
 };
