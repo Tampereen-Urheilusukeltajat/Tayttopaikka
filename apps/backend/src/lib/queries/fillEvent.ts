@@ -10,12 +10,12 @@ import { log } from '../utils/log';
 import { type Knex } from 'knex';
 import { getStorageCylinder, getStorageCylinderWithGasName } from './storageCylinder';
 import { type Gas, type GasPrice } from '../../types/gas.types';
-import { getDiluentPrice } from './gas';
+import { getActiveGasPriceForGas } from './gas';
 import { selectCylinderSet } from './divingCylinderSet';
 import { getUserWithId } from './user';
 import { errorHandler } from '../utils/errorHandler';
 import { type FastifyReply } from 'fastify';
-import { calcGasFillCostCents, calcTotalFillCostCents } from '@tayttopaikka/pricing';
+import { calcDiluentFillCostCents, calcGasFillCostCents, calcTotalFillCostCents, calculateVolumeLitres } from '@tayttopaikka/pricing';
 
 const getActivePriceId = async (
   trx: Knex.Transaction,
@@ -196,15 +196,14 @@ export const createFillEvent = async (
           if (storageCylinder.gasName !== 'Diluent')
             throw new Error('Storage cylinder is not a diluent cylinder');
 
-          const volumeLitres =
-            Math.ceil(dcu.startPressure - dcu.endPressure) *
-            storageCylinder.volume;
-
-          const serverPrice = await getDiluentPrice(
-            String(dcu.storageCylinderId),
-            dcu.heliumPercentage,
-            trx,
+          const volumeLitres = calculateVolumeLitres(
+            storageCylinder.volume,
+            dcu.startPressure,
+            dcu.endPressure,
           );
+
+          const heliumPrice = await getActiveGasPriceForGas('Helium', trx);
+          if (!heliumPrice) throw new Error('No active price found for Helium');
 
           await trx('fill_event_diluent_fill').insert({
             fill_event_id: id,
@@ -213,8 +212,12 @@ export const createFillEvent = async (
             oxygen_percentage: dcu.oxygenPercentage,
             helium_percentage: dcu.heliumPercentage,
             oxygen_gas_price_id: null,
-            helium_gas_price_id: serverPrice.heliumGasPriceId,
-            price_eur_cents: serverPrice.pricePerLitreCents * volumeLitres,
+            helium_gas_price_id: heliumPrice.gasPriceId,
+            price_eur_cents: calcDiluentFillCostCents(
+              volumeLitres,
+              dcu.heliumPercentage,
+              heliumPrice.priceEurCents,
+            ),
           });
         }),
       );
