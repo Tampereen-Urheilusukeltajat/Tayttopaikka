@@ -1,7 +1,5 @@
 FROM node:24.12.0-alpine AS build
 
-ENV NODE_ENV=production
-
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
@@ -10,12 +8,16 @@ WORKDIR /app
 # Copy workspace files
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
-# Copy frontend app
+# Copy frontend app and shared packages
 COPY apps/frontend ./apps/frontend
+COPY packages ./packages
 
-# Install dependencies and build
+# Install only frontend and its workspace deps (excludes backend)
 RUN pnpm install --frozen-lockfile --filter @tayttopaikka/frontend...
-RUN pnpm exec turbo --filter @tayttopaikka/frontend build
+
+# Build in dependency order: pricing first, then frontend
+RUN pnpm --filter @tayttopaikka/pricing build
+RUN NODE_ENV=production pnpm --filter @tayttopaikka/frontend build
 
 # Serve app with nginx
 FROM nginx:1.25.1
