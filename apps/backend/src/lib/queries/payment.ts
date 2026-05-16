@@ -29,7 +29,7 @@ export const getUnpaidFillEvents = async (
     WITH gas_fill_price AS (
       SELECT
         fe.id AS fill_event_id,
-        SUM(fegf.volume_litres * gp.price_eur_cents) AS price
+        SUM(fegf.volume_litres * CAST(gp.price_eur_cents AS DECIMAL(6,2))) AS price
       FROM fill_event fe
       JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
       JOIN gas_price gp ON gp.id = fegf.gas_price_id
@@ -47,7 +47,7 @@ export const getUnpaidFillEvents = async (
     fill_event_price AS (
       SELECT
         fe.id AS fill_event_id,
-        COALESCE(gfp.price, 0) + COALESCE(dfp.price, 0) AS price
+        CEIL(COALESCE(gfp.price, 0) + COALESCE(dfp.price, 0)) AS price
       FROM fill_event fe
       LEFT JOIN gas_fill_price gfp ON gfp.fill_event_id = fe.id
       LEFT JOIN diluent_fill_price dfp ON dfp.fill_event_id = fe.id
@@ -108,21 +108,39 @@ export const calculateFillEventTotalPrice = async (
     DBResponse<Array<{ totalPrice: number }>>
   >(
     `
-    SELECT
-      COALESCE(SUM(fegf.volume_litres * gp.price_eur_cents), 0) +
-      COALESCE((
-        SELECT SUM(price_eur_cents)
-        FROM fill_event_diluent_fill
-        WHERE fill_event_id IN (${fillEventIds.map(() => '?').join(',')})
-      ), 0) AS totalPrice
-    FROM fill_event fe
-    JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
-    JOIN gas_price gp ON gp.id = fegf.gas_price_id
-    WHERE
-      fe.id IN (${fillEventIds.map(() => '?').join(',')}) AND
-      fegf.storage_cylinder_id IS NOT NULL
+    WITH gas_fill_price AS (
+      SELECT
+        fe.id AS fill_event_id,
+        SUM(fegf.volume_litres * CAST(gp.price_eur_cents AS DECIMAL(6,2))) AS price
+      FROM fill_event fe
+      JOIN fill_event_gas_fill fegf ON fegf.fill_event_id = fe.id
+      JOIN gas_price gp ON gp.id = fegf.gas_price_id
+      WHERE
+        fe.id IN (${fillEventIds.map(() => '?').join(',')}) AND
+        fegf.storage_cylinder_id IS NOT NULL
+      GROUP BY fe.id
+    ),
+    diluent_fill_price AS (
+      SELECT
+        fill_event_id,
+        COALESCE(SUM(price_eur_cents), 0) AS price
+      FROM fill_event_diluent_fill
+      WHERE fill_event_id IN (${fillEventIds.map(() => '?').join(',')})
+      GROUP BY fill_event_id
+    ),
+    fill_event_price AS (
+      SELECT
+        fe.id AS fill_event_id,
+        CEIL(COALESCE(gfp.price, 0) + COALESCE(dfp.price, 0)) AS price
+      FROM fill_event fe
+      LEFT JOIN gas_fill_price gfp ON gfp.fill_event_id = fe.id
+      LEFT JOIN diluent_fill_price dfp ON dfp.fill_event_id = fe.id
+      WHERE fe.id IN (${fillEventIds.map(() => '?').join(',')})
+    )
+    SELECT COALESCE(SUM(price), 0) AS totalPrice
+    FROM fill_event_price
   `,
-    [...fillEventIds, ...fillEventIds],
+    [...fillEventIds, ...fillEventIds, ...fillEventIds],
   );
 
   if (totalPrice?.[0]?.totalPrice === null) {

@@ -69,16 +69,6 @@ export const mapGasToName = (gas?: AvailableGasses): string => {
   }
 };
 
-export const formatEurCentsToEur = (eurCents: number): number =>
-  parseFloat((eurCents / 100).toFixed(3));
-export const formatEurToEurCents = (eur: number): number => eur * 100;
-
-export const calculateGasConsumption = (
-  cylinderVolume: number,
-  startPressure: number,
-  endPressure: number,
-): number => (startPressure - endPressure) * cylinderVolume;
-
 export const tokenExpired = (exp: number): boolean =>
   // Date now gives timestamp in ms, token has seconds
   Math.floor(Date.now() / 1000) > exp;

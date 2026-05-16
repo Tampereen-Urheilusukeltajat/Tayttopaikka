@@ -26,4 +26,4 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build frontend
-        run: pnpm --filter @tayttopaikka/frontend build
+        run: pnpm exec turbo --filter @tayttopaikka/frontend build

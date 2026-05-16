@@ -9,7 +9,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { useAllGasPricesQuery, type GasWithPricing } from '../../lib/queries/gasQuery';
-import { formatEurCentsToEur, mapGasToName } from '../../lib/utils';
+import { mapGasToName } from '../../lib/utils';
 import { PrimaryButton, ElementButton } from '../../components/common/Button/Buttons';
 import { Modal } from '../../components/common/Modal/Modal';
 import { CommonTableV2 } from '../../components/common/Table/CommonTable-v2';
@@ -17,6 +17,7 @@ import styles from '../../components/common/Table/CommonTable.module.scss';
 import { GasPriceModal } from './GasPriceModal';
 import { useDeleteGasPriceMutation } from '../../lib/queries/gasMutations';
 import { useState } from 'react';
+import { eurCentsToEur } from '@tayttopaikka/pricing';
 
 type PriceRow = GasWithPricing & {
   subRows?: PriceRow[];
@@ -51,7 +52,7 @@ const buildTableRows = (prices: GasWithPricing[]): PriceRow[] => {
 };
 
 const formatDate = (iso: string): string => format(new Date(iso), 'dd.MM.yyyy');
-const formatPrice = (cents: number): string => `${formatEurCentsToEur(cents)} €`;
+const formatPrice = (cents: number): string => `${eurCentsToEur(cents)} €`;
 const formatActiveTo = (iso: string | undefined): string => {
   if (!iso || iso.startsWith('9999')) return 'Toistaiseksi';
   return formatDate(iso);

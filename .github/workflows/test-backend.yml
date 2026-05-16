@@ -56,6 +56,9 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build pricing package
+        run: pnpm exec turbo --filter @tayttopaikka/pricing build
       - name: Create empty .env file
         run: touch apps/backend/.env
       - name: Start the database and jwt refresh token cache

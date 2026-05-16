@@ -4,10 +4,11 @@ import { BsTrash } from 'react-icons/bs';
 import { type GasWithPricing } from '../../../lib/queries/gasQuery';
 import { type StorageCylinder } from '../../../lib/queries/storageCylinderQuery';
 import {
-  calculateGasConsumption,
-  formatEurCentsToEur,
-  mapGasToName,
-} from '../../../lib/utils';
+  calcGasFillCostCents,
+  calculateVolumeLitres,
+  eurCentsToEur,
+} from '@tayttopaikka/pricing';
+import { mapGasToName } from '../../../lib/utils';
 import {
   ButtonType,
   ElementButton,
@@ -57,12 +58,15 @@ const FillingEventRowComponent: React.FC<FillingEventRowProps> = ({
   useEffect(() => {
     setFieldValue(
       `fillingEventRows.${index}.priceEurCents`,
-      formatEurCentsToEur(
-        calculateGasConsumption(
-          storageCylinderVolume ?? 0,
-          startPressure ?? 0,
-          endPressure ?? 0,
-        ) * (gasPriceEurCents ?? 0),
+      eurCentsToEur(
+        calcGasFillCostCents(
+          calculateVolumeLitres(
+            storageCylinderVolume ?? 0,
+            startPressure ?? 0,
+            endPressure ?? 0,
+          ),
+          gasPriceEurCents ?? 0,
+        ),
       ),
     );
   }, [
@@ -77,7 +81,7 @@ const FillingEventRowComponent: React.FC<FillingEventRowProps> = ({
   useEffect(() => {
     setFieldValue(
       `fillingEventRows.${index}.consumption`,
-      calculateGasConsumption(
+      calculateVolumeLitres(
         storageCylinderVolume ?? 0,
         startPressure ?? 0,
         endPressure ?? 0,

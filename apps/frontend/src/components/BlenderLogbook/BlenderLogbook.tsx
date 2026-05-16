@@ -10,7 +10,6 @@ import { PricingTile } from './components/PricingTile';
 import { FillingTile } from './components/FillingTile';
 import {
   DiluentFillingTile,
-  calcDiluentRowPriceEur,
 } from './components/DiluentFillingTile';
 import { SavingTile } from './components/SavingTile';
 import {
@@ -18,8 +17,14 @@ import {
   AvailableMixtureCompositions,
   AvailableMixtures,
   formalizeGasMixture,
-  formatEurToEurCents,
 } from '../../lib/utils';
+import {
+  calcDiluentFillCostCents,
+  calcGasFillCostCents,
+  calcTotalFillCostCents,
+  calculateVolumeLitres,
+  eurCentsToEur,
+} from '@tayttopaikka/pricing';
 import { BLENDER_FILLING_EVENT_VALIDATION_SCHEMA } from './validation';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -69,6 +74,39 @@ type DiluentFillingRow = {
 type FormFields = FillingEventBasicInfo & {
   diluentFillingRows: DiluentFillingRow[];
   fillingEventRows: FillingEventRow[];
+};
+
+const computeTotalFillCostCents = (
+  fillingEventRows: FillingEventRow[],
+  diluentFillingRows: DiluentFillingRow[],
+  storageCylinders: StorageCylinder[],
+  diluentCylinders: StorageCylinder[],
+  gases: GasWithPricing[],
+): number => {
+  const gasCostsCents = fillingEventRows.map((row) => {
+    const cyl = storageCylinders.find((sc) => sc.id === row.storageCylinderId);
+    if (!cyl) return 0;
+    const priceCents = gases.find((g) => g.gasId === cyl.gasId)?.priceEurCents ?? 0;
+    return calcGasFillCostCents(
+      calculateVolumeLitres(cyl.volume, row.startPressure, row.endPressure),
+      priceCents,
+    );
+  });
+
+  const hePriceCents =
+    gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+
+  const diluentCostsCents = diluentFillingRows.map((row) => {
+    const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
+    if (!cyl) return 0;
+    return calcDiluentFillCostCents(
+      calculateVolumeLitres(cyl.volume, row.startPressure, row.endPressure),
+      Number(row.heliumPercentage),
+      hePriceCents,
+    );
+  });
+  
+  return calcTotalFillCostCents(gasCostsCents, diluentCostsCents);
 };
 
 // TODO find a better way to initialize divingCylinderSetId
@@ -143,15 +181,13 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
         values.heliumPercentage,
       );
 
-      const gasFillTotal = values.fillingEventRows
-        .map((row) => row.priceEurCents)
-        .reduce((sum, price) => sum + price, 0);
-      const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
-      const diluentFillTotal = values.diluentFillingRows.reduce((sum, row) => {
-        const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
-        return sum + calcDiluentRowPriceEur(row, cyl, hePriceCents);
-      }, 0);
-      const totalPriceEurCents = formatEurToEurCents(gasFillTotal + diluentFillTotal);
+      const totalPriceEurCents = computeTotalFillCostCents(
+        values.fillingEventRows,
+        values.diluentFillingRows,
+        storageCylinders,
+        diluentCylinders,
+        gases,
+      );
 
       // Allow user to do pure air fills via Happihäkki page
       const filledAir =
@@ -194,7 +230,7 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
         },
       );
     },
-    [diluentCylinders, fillEventMutation, gases],
+    [diluentCylinders, fillEventMutation, gases, storageCylinders],
   );
 
   return (
@@ -249,18 +285,15 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
             />
 
             <SavingTile
-              totalPrice={
-                values.fillingEventRows
-                  .map((row) => row.priceEurCents)
-                  .reduce((sum, price) => sum + price, 0) +
-                (() => {
-                  const heP = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
-                  return values.diluentFillingRows.reduce((sum, row) => {
-                    const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
-                    return sum + calcDiluentRowPriceEur(row, cyl, heP);
-                  }, 0);
-                })()
-              }
+              totalPrice={eurCentsToEur(
+                computeTotalFillCostCents(
+                  values.fillingEventRows,
+                  values.diluentFillingRows,
+                  storageCylinders,
+                  diluentCylinders,
+                  gases,
+                ),
+              )}
               errors={errors}
               values={values}
               isSubmitting={isSubmitting}
