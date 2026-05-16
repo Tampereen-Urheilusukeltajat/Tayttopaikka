@@ -92,8 +92,10 @@ const computeTotalFillCostCents = (
       priceCents,
     );
   });
+
   const hePriceCents =
     gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+
   const diluentCostsCents = diluentFillingRows.map((row) => {
     const cyl = diluentCylinders.find((sc) => sc.id === row.storageCylinderId);
     if (!cyl) return 0;
@@ -103,6 +105,7 @@ const computeTotalFillCostCents = (
       hePriceCents,
     );
   });
+  
   return calcTotalFillCostCents(gasCostsCents, diluentCostsCents);
 };
 
