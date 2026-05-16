@@ -296,7 +296,7 @@ export const calcTotalCost = async (
         .where('id', fill.gasPriceId)
         .first('price_eur_cents as priceEurCents');
       const price = JSON.parse(JSON.stringify(gasPrice));
-      return calcGasFillCostCents(fill.volumeLitres, price.priceEurCents);
+      return calcGasFillCostCents(fill.volumeLitres, parseFloat(price.priceEurCents.toFixed(2)));
     }),
   );
 
