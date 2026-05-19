@@ -96,6 +96,7 @@ describe('Pricing consistency: library vs SQL', () => {
     await getTestKnex()('fill_event_gas_fill').del();
     await getTestKnex()('fill_event_payment_event').del();
     await getTestKnex()('payment_event').del();
+    await getTestKnex()('fill_event_cylinder_set').del();
     await getTestKnex()('fill_event').del();
     await server.close();
   });
@@ -132,7 +133,7 @@ describe('Pricing consistency: library vs SQL', () => {
     assert.strictEqual(libraryPrice, 60);
 
     await postFill({
-      cylinderSetId: CYLINDER_SET_ID,
+      cylinderSetIds: [CYLINDER_SET_ID],
       gasMixture: 'EAN32',
       filledAir: false,
       storageCylinderUsageArr: [
@@ -159,7 +160,7 @@ describe('Pricing consistency: library vs SQL', () => {
     assert.strictEqual(libraryPrice, 240);
 
     await postFill({
-      cylinderSetId: CYLINDER_SET_ID,
+      cylinderSetIds: [CYLINDER_SET_ID],
       gasMixture: 'TMX 20/40',
       filledAir: false,
       storageCylinderUsageArr: [],
@@ -188,7 +189,7 @@ describe('Pricing consistency: library vs SQL', () => {
     ); // 240 cents
 
     const id1 = await postFill({
-      cylinderSetId: CYLINDER_SET_ID,
+      cylinderSetIds: [CYLINDER_SET_ID],
       gasMixture: 'EAN32',
       filledAir: false,
       storageCylinderUsageArr: [
@@ -197,7 +198,7 @@ describe('Pricing consistency: library vs SQL', () => {
       price: price1,
     });
     const id2 = await postFill({
-      cylinderSetId: CYLINDER_SET_ID,
+      cylinderSetIds: [CYLINDER_SET_ID],
       gasMixture: 'TMX 20/40',
       filledAir: false,
       storageCylinderUsageArr: [],
@@ -241,7 +242,7 @@ describe('Pricing consistency: library vs SQL', () => {
     assert.strictEqual(price2, 270);
 
     const id1 = await postFill({
-      cylinderSetId: CYLINDER_SET_ID,
+      cylinderSetIds: [CYLINDER_SET_ID],
       gasMixture: 'EAN32',
       filledAir: false,
       storageCylinderUsageArr: [
@@ -250,7 +251,7 @@ describe('Pricing consistency: library vs SQL', () => {
       price: price1,
     });
     const id2 = await postFill({
-      cylinderSetId: CYLINDER_SET_ID,
+      cylinderSetIds: [CYLINDER_SET_ID],
       gasMixture: 'EAN32',
       filledAir: false,
       storageCylinderUsageArr: [

@@ -58,12 +58,13 @@ describe('create fill event', () => {
     after(async () => {
       // delete successful fill events
       await getTestKnex()('fill_event_gas_fill').del();
+      await getTestKnex()('fill_event_cylinder_set').del();
       await getTestKnex()('fill_event').del();
     });
 
     test('it creates a new fill event with only compressed air', async () => {
       const payload = {
-        cylinderSetId: 'a4e1035e-f36e-4056-9a1b-5925a3c5793e', // single cylinder set
+        cylinderSetIds: ['a4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         gasMixture: 'Paineilma',
         filledAir: true,
         storageCylinderUsageArr: [],
@@ -92,7 +93,7 @@ describe('create fill event', () => {
 
     test('it creates a new fill event with blender privileges', async () => {
       const PAYLOAD = {
-        cylinderSetId: 'b4e1035e-f36e-4056-9a1b-5925a3c5793e',
+        cylinderSetIds: ['b4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         gasMixture: 'seos',
         filledAir: false,
         storageCylinderUsageArr: [
@@ -150,7 +151,7 @@ describe('create fill event', () => {
       const compressorId = '54e3e8b0-53d4-11ed-9342-0242ac120002';
 
       const payload = {
-        cylinderSetId: 'a4e1035e-f36e-4056-9a1b-5925a3c5793e', // single cylinder set
+        cylinderSetIds: ['a4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         gasMixture: 'Paineilma',
         filledAir: true,
         storageCylinderUsageArr: [],
@@ -176,6 +177,37 @@ describe('create fill event', () => {
       assert.strictEqual(fillEvent.length, 1);
       assert.deepStrictEqual(fillEvent[0].compressor_id, compressorId);
     });
+
+    test('it creates a fill event for two cylinder sets', async () => {
+      const payload = {
+        cylinderSetIds: [
+          'a4e1035e-f36e-4056-9a1b-5925a3c5793e',
+          'f4e1035e-f36e-4056-9a1b-5925a3c5793e',
+        ],
+        gasMixture: 'Paineilma',
+        filledAir: true,
+        storageCylinderUsageArr: [],
+        price: 0,
+      };
+      const res = await server.inject({
+        url: 'api/fill-event',
+        method: 'POST',
+        body: payload,
+        headers,
+      });
+
+      const resBody = JSON.parse(res.body);
+      assert.deepStrictEqual(res.statusCode, 201);
+      assert.deepStrictEqual(
+        resBody.cylinderSetIds.sort(),
+        payload.cylinderSetIds.sort(),
+      );
+
+      const joinRows = await getTestKnex()('fill_event_cylinder_set')
+        .where('fill_event_id', resBody.id)
+        .select();
+      assert.strictEqual(joinRows.length, 2);
+    });
   });
 
   describe('unsuccessful', () => {
@@ -190,7 +222,7 @@ describe('create fill event', () => {
 
     test('it fails when no gases are given', async () => {
       const PAYLOAD = {
-        cylinderSetId: 'f4e1035e-f36e-4056-9a1b-5925a3c5793e',
+        cylinderSetIds: ['f4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         gasMixture: 'no gas',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -210,7 +242,7 @@ describe('create fill event', () => {
 
     test('it fails with invalid cylinder set', async () => {
       const PAYLOAD = {
-        cylinderSetId: 'a4e1035e-f36e-4056-9a1b-696969696969',
+        cylinderSetIds: ['a4e1035e-f36e-4056-9a1b-696969696969'],
         gasMixture: 'invalid cylinder set',
         filledAir: true,
         storageCylinderUsageArr: [],
@@ -230,7 +262,7 @@ describe('create fill event', () => {
 
     test('it fails with negative storageCylinder pressure', async () => {
       const PAYLOAD = {
-        cylinderSetId: 'f4e1035e-f36e-4056-9a1b-5925a3c5793e',
+        cylinderSetIds: ['f4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         gasMixture: 'neg pressure',
         filledAir: true,
         storageCylinderUsageArr: [
@@ -259,7 +291,7 @@ describe('create fill event', () => {
 
     test('it fails when the request price is not right', async () => {
       const PAYLOAD = {
-        cylinderSetId: 'f4e1035e-f36e-4056-9a1b-5925a3c5793e',
+        cylinderSetIds: ['f4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         filledAir: true,
         gasMixture: 'price=bad',
         storageCylinderUsageArr: [
@@ -298,7 +330,7 @@ describe('create fill event', () => {
       const tokens = JSON.parse(login.body);
       headers = { Authorization: 'Bearer ' + String(tokens.accessToken) };
       const PAYLOAD = {
-        cylinderSetId: 'b4e1035e-f36e-4056-9a1b-5925a3c57100',
+        cylinderSetIds: ['b4e1035e-f36e-4056-9a1b-5925a3c57100'],
         gasMixture: 'EAN32',
         filledAir: true,
         storageCylinderUsageArr: [
@@ -329,6 +361,7 @@ describe('create fill event', () => {
     afterEach(async () => {
       await getTestKnex()('fill_event_diluent_fill').del();
       await getTestKnex()('fill_event_gas_fill').del();
+      await getTestKnex()('fill_event_cylinder_set').del();
       await getTestKnex()('fill_event').del();
     });
 
@@ -337,7 +370,7 @@ describe('create fill event', () => {
       // vol = ceil(10-8) * 50 = 100L
       // price = (0.40*300) * 100 = 12000 cents (O2 not charged)
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'TMX 20/40',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -374,7 +407,7 @@ describe('create fill event', () => {
 
     test('fails when using a non-diluent cylinder in diluentCylinderUsageArr', async () => {
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'TMX',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -402,7 +435,7 @@ describe('create fill event', () => {
 
     test('fails with negative fill pressure in diluentCylinderUsageArr', async () => {
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'TMX',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -430,7 +463,7 @@ describe('create fill event', () => {
 
     test('fails when oxygen + helium percentages exceed 100', async () => {
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'TMX',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -462,7 +495,7 @@ describe('create fill event', () => {
     test('creates a fill event with 100% oxygen and 0% helium', async () => {
       // vol = ceil(10-8) * 50 = 100L, price = 0 (only helium is charged, He=0%)
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'Oxygen 100%',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -490,7 +523,7 @@ describe('create fill event', () => {
     test('creates a fill event with 0% oxygen and 100% helium', async () => {
       // vol = ceil(10-8) * 50 = 100L, price = 1.0*300 * 100 = 30000 cents
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'Helium 100%',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -518,7 +551,7 @@ describe('create fill event', () => {
     test('creates a fill event with 0% oxygen and 50% helium', async () => {
       // vol = ceil(10-8) * 50 = 100L, price = 0.5*300 * 100 = 15000 cents
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'Helium 50%',
         filledAir: false,
         storageCylinderUsageArr: [],
@@ -545,7 +578,7 @@ describe('create fill event', () => {
 
     test('fails when client-submitted price does not match server-calculated price', async () => {
       const PAYLOAD = {
-        cylinderSetId: CYLINDER_SET_ID,
+        cylinderSetIds: [CYLINDER_SET_ID],
         gasMixture: 'TMX',
         filledAir: false,
         storageCylinderUsageArr: [],

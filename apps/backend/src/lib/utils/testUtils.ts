@@ -64,6 +64,7 @@ const TABLE_READ_ORDER = [
   'storage_cylinder',
   'fill_event_gas_fill',
   'fill_event_diluent_fill',
+  'fill_event_cylinder_set',
   'payment_event',
   'fill_event_payment_event',
 ];

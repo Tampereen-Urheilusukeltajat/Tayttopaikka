@@ -1,8 +1,8 @@
 export type FillEvent = {
   id: string;
   userId: string;
-  cylinderSetId: string;
-  cylinderSetName: string;
+  cylinderSetIds: string[];
+  cylinderSetNames: string[];
   gasMixture: string;
   description: string;
   price: number;
@@ -26,7 +26,7 @@ export type DiluentCylinderUsage = {
 };
 
 export type NewFillEvent = {
-  cylinderSetId: string;
+  cylinderSetIds: string[];
   gasMixture: string;
   filledAir: boolean;
   description: string;

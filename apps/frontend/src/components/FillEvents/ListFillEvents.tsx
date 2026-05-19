@@ -18,7 +18,10 @@ const columns = [
     header: 'Päivämäärä',
     cell: (info) => format(new Date(info.getValue()), 'dd.MM.yy HH:mm'),
   }),
-  columnHelper.accessor('cylinderSetName', { header: 'Pullosetti' }),
+  columnHelper.accessor('cylinderSetNames', {
+    header: 'Pullosetti',
+    cell: (info) => info.getValue().join(', '),
+  }),
   columnHelper.accessor('gasMixture', { header: 'Kaasuseos' }),
   columnHelper.accessor('compressorName', {
     header: 'Kompressori',

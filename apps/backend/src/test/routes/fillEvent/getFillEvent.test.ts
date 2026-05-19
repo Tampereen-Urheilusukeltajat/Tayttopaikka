@@ -66,10 +66,10 @@ describe('get fill events of the user', () => {
       assert.deepStrictEqual(res.statusCode, 200);
       assert.strictEqual(Array.isArray(resBody), true);
       assert.strictEqual(resBody.length, 1);
-      assert.strictEqual(
-        resBody[0].cylinderSetId,
+      assert.deepStrictEqual(resBody[0].cylinderSetIds, [
         'f4e1035e-f36e-4056-9a1b-5925a3c5793e',
-      );
+      ]);
+      assert.deepStrictEqual(resBody[0].cylinderSetNames, ['pullosetti_1']);
       assert.strictEqual(resBody[0].gasMixture, 'EAN21');
       assert.strictEqual(resBody[0].price, 0);
     });

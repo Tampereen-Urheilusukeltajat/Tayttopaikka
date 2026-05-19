@@ -57,33 +57,44 @@ export const getFillEvents = async (
   const trx = await knexController.transaction();
 
   try {
-    const fillQuery = (await trx('fill_event')
-      .where('user_id', userId)
-      .innerJoin(
-        'diving_cylinder_set',
-        'fill_event.cylinder_set_id',
-        'diving_cylinder_set.id',
+    const fillQuery = await trx('fill_event as fe')
+      .where('fe.user_id', userId)
+      .join('fill_event_cylinder_set as fecs', 'fecs.fill_event_id', 'fe.id')
+      .join('diving_cylinder_set as dcs', 'dcs.id', 'fecs.cylinder_set_id')
+      .leftJoin('compressor as c', 'c.id', 'fe.compressor_id')
+      .groupBy(
+        'fe.id',
+        'fe.user_id',
+        'fe.gas_mixture',
+        'fe.description',
+        'fe.created_at',
+        'c.id',
+        'c.name',
       )
-      .leftJoin('compressor', 'fill_event.compressor_id', 'compressor.id')
       .select(
-        'fill_event.id',
-        'fill_event.user_id as userId',
-        'diving_cylinder_set.name as cylinderSetName',
-        'diving_cylinder_set.id as cylinderSetId',
-        'fill_event.gas_mixture as gasMixture',
-        'fill_event.description',
-        'fill_event.created_at as createdAt',
-        'compressor.id as compressorId',
-        'compressor.name as compressorName',
-      )) as Array<Omit<GetFillEventsResponse, 'price'>>;
+        'fe.id',
+        'fe.user_id as userId',
+        trx.raw(
+          "GROUP_CONCAT(DISTINCT dcs.id ORDER BY dcs.name SEPARATOR ',') as cylinderSetIds",
+        ),
+        trx.raw(
+          "GROUP_CONCAT(DISTINCT dcs.name ORDER BY dcs.name SEPARATOR ',') as cylinderSetNames",
+        ),
+        'fe.gas_mixture as gasMixture',
+        'fe.description',
+        'fe.created_at as createdAt',
+        'c.id as compressorId',
+        'c.name as compressorName',
+      );
 
     const result = await Promise.all(
-      fillQuery.map(async (fillEvent): Promise<GetFillEventsResponse> => {
-        const price = await calcTotalCost(trx, Number(fillEvent.id));
+      fillQuery.map(async (row): Promise<GetFillEventsResponse> => {
+        const price = await calcTotalCost(trx, Number(row.id));
 
         return {
-          ...fillEvent,
-
+          ...row,
+          cylinderSetIds: String(row.cylinderSetIds).split(','),
+          cylinderSetNames: String(row.cylinderSetNames).split(','),
           price,
         };
       }),
@@ -103,7 +114,7 @@ export const createFillEvent = async (
   reply: FastifyReply,
 ): Promise<FastifyReply> => {
   const {
-    cylinderSetId,
+    cylinderSetIds,
     gasMixture,
     filledAir,
     storageCylinderUsageArr,
@@ -137,18 +148,30 @@ export const createFillEvent = async (
         throw new Error('No blender privileges');
       }
 
-      const set = await selectCylinderSet(trx, cylinderSetId);
-      if (set === undefined) throw new Error('Cylinder set not found');
+      const sets = await Promise.all(
+        cylinderSetIds.map((csId) => selectCylinderSet(trx, csId)),
+      );
+      if (sets.some((s) => s === undefined))
+        throw new Error('Cylinder set not found');
 
-      const params: Array<string | null> = [user.id, cylinderSetId, gasMixture];
+      const params: Array<string | null> = [user.id, gasMixture];
       const sql =
-        'INSERT INTO fill_event (user_id, cylinder_set_id, gas_mixture, compressor_id, description) VALUES (?,?,?,?,?) RETURNING id';
+        'INSERT INTO fill_event (user_id, gas_mixture, compressor_id, description) VALUES (?,?,?,?) RETURNING id';
       params.push(compressorId ?? null);
       params.push(description ?? null);
 
       // Use knex.raw to enable use of RETURNING clause to avoid race conditions
       const res = await trx.raw(sql, params);
       const id = JSON.parse(JSON.stringify(res))[0][0].id as number;
+
+      await Promise.all(
+        cylinderSetIds.map((csId) =>
+          trx('fill_event_cylinder_set').insert({
+            fill_event_id: id,
+            cylinder_set_id: csId,
+          }),
+        ),
+      );
 
       if (filledAir) {
         const airGasId = await getAirGasId(trx);

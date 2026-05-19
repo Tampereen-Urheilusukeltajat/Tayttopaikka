@@ -49,7 +49,7 @@ export const NewFillingEvent: React.FC<NewFillingEventProps> = ({
     for (const divingCylinderSetId of values.divingCylinderSetIds) {
       fillEventMutation.mutate(
         {
-          cylinderSetId: divingCylinderSetId,
+          cylinderSetIds: [divingCylinderSetId],
           gasMixture: 'EAN21',
           filledAir: true,
           description: values.additionalInformation,

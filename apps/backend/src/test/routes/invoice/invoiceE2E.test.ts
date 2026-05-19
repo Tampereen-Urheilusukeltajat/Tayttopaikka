@@ -82,6 +82,7 @@ describe('Invoice e2e flow', () => {
     await getTestKnex()('invoice').del();
     await getTestKnex()('fill_event_payment_event').del();
     await getTestKnex()('payment_event').del();
+    await getTestKnex()('fill_event_cylinder_set').del();
     await getTestKnex()('fill_event').del();
     await server.close();
   });
@@ -96,7 +97,7 @@ describe('Invoice e2e flow', () => {
       url: 'api/fill-event',
       method: 'POST',
       body: {
-        cylinderSetId: 'a4e1035e-f36e-4056-9a1b-5925a3c5793e',
+        cylinderSetIds: ['a4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         gasMixture: 'EAN32',
         filledAir: false,
         storageCylinderUsageArr: [
@@ -121,7 +122,7 @@ describe('Invoice e2e flow', () => {
       url: 'api/fill-event',
       method: 'POST',
       body: {
-        cylinderSetId: 'a4e1035e-f36e-4056-9a1b-5925a3c5793e',
+        cylinderSetIds: ['a4e1035e-f36e-4056-9a1b-5925a3c5793e'],
         gasMixture: 'TMX 20/40',
         filledAir: false,
         storageCylinderUsageArr: [],
