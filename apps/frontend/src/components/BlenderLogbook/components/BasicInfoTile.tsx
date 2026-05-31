@@ -9,6 +9,7 @@ import {
 import { type CommonTileProps } from '../BlenderLogbook';
 import { type Compressor } from '../../../lib/queries/compressorQuery';
 import { useFormikContext } from 'formik';
+import { ChipSelect } from '../../common/ChipSelect';
 
 type BasicInfoTileProps = CommonTileProps & {
   divingCylinderSets: DivingCylinderSet[];
@@ -29,15 +30,30 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
   const orderedCylinderSets = divingCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   const orderedClubCylinderSets = clubCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-  const visibleSets = showClubCylinders
-    ? [...orderedCylinderSets, ...orderedClubCylinderSets]
-    : orderedCylinderSets;
+  const toOption = (dcs: DivingCylinderSet, allSets: DivingCylinderSet[]) => ({
+    value: dcs.id,
+    label:
+      dcs.name +
+      (allSets.filter((e) => e.name === dcs.name).length > 1
+        ? ` (${dcs.cylinders[0]?.serialNumber ?? 'N/A'})`
+        : ''),
+  });
 
-  const toggleCylinderSet = (id: string, checked: boolean): void => {
-    const current: string[] = values.divingCylinderSetIds;
-    const next = checked ? [...current, id] : current.filter((x) => x !== id);
-    void setFieldValue('divingCylinderSetIds', next);
-  };
+  const allSets = [...orderedCylinderSets, ...orderedClubCylinderSets];
+  const optionGroups = [
+    {
+      groupLabel: 'Omat pullot',
+      options: orderedCylinderSets.map((dcs) => toOption(dcs, allSets)),
+    },
+    ...(showClubCylinders && orderedClubCylinderSets.length > 0
+      ? [
+          {
+            groupLabel: 'Seuran pullot',
+            options: orderedClubCylinderSets.map((dcs) => toOption(dcs, allSets)),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div>
@@ -58,33 +74,15 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
       </div>
       <div className="d-flex flex-column gap-3">
         <div className="d-flex gap-3 flex-wrap">
-          <div>
-            <Form.Label>Pullosetti</Form.Label>
-            {errors.divingCylinderSetIds && (
-              <div className="text-danger small">{String(errors.divingCylinderSetIds)}</div>
-            )}
-            <div className="d-flex flex-column gap-1">
-              {visibleSets.map((dcs) => {
-                const allSets = [...orderedCylinderSets, ...orderedClubCylinderSets];
-                const label =
-                  dcs.name +
-                  (allSets.filter((e) => e.name === dcs.name).length > 1
-                    ? ` (${dcs.cylinders[0]?.serialNumber ?? 'N/A'})`
-                    : '');
-                return (
-                  <Form.Check
-                    key={dcs.id}
-                    type="checkbox"
-                    id={`cylinder-set-${dcs.id}`}
-                    label={label}
-                    disabled={values.userConfirm}
-                    checked={values.divingCylinderSetIds.includes(dcs.id)}
-                    onChange={(e) => toggleCylinderSet(dcs.id, e.target.checked)}
-                  />
-                );
-              })}
-            </div>
-          </div>
+          <ChipSelect
+            label="Pullosetti"
+            optionGroups={optionGroups}
+            selectedValues={values.divingCylinderSetIds}
+            onChange={(next) => { void setFieldValue('divingCylinderSetIds', next); }}
+            disabled={values.userConfirm}
+            errorText={errors.divingCylinderSetIds ? String(errors.divingCylinderSetIds) : undefined}
+            style={{ minWidth: '180px' }}
+          />
           <DropdownMenu
             name="compressorId"
             label="Kompressori"
