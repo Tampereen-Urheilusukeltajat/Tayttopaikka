@@ -57,6 +57,10 @@ export const getFillEvents = async (
   const trx = await knexController.transaction();
 
   try {
+    // NOTE: The INNER JOIN on fill_event_cylinder_set intentionally excludes
+    // fill events with no linked cylinder sets. 
+    // Those rows are considered invalid under the
+    // new schema and are hidden from results rather than crashing the query
     const fillQuery = await trx('fill_event as fe')
       .where('fe.user_id', userId)
       .join('fill_event_cylinder_set as fecs', 'fecs.fill_event_id', 'fe.id')
@@ -74,11 +78,12 @@ export const getFillEvents = async (
       .select(
         'fe.id',
         'fe.user_id as userId',
+        // Use '||' as separator — safe for UUIDs and names.
         trx.raw(
-          "GROUP_CONCAT(DISTINCT dcs.id ORDER BY dcs.name SEPARATOR ',') as cylinderSetIds",
+          "GROUP_CONCAT(DISTINCT dcs.id ORDER BY dcs.name SEPARATOR '||') as cylinderSetIds",
         ),
         trx.raw(
-          "GROUP_CONCAT(DISTINCT dcs.name ORDER BY dcs.name SEPARATOR ',') as cylinderSetNames",
+          "GROUP_CONCAT(DISTINCT dcs.name ORDER BY dcs.name SEPARATOR '||') as cylinderSetNames",
         ),
         'fe.gas_mixture as gasMixture',
         'fe.description',
@@ -93,8 +98,12 @@ export const getFillEvents = async (
 
         return {
           ...row,
-          cylinderSetIds: String(row.cylinderSetIds).split(','),
-          cylinderSetNames: String(row.cylinderSetNames).split(','),
+          // @TODO We should combine the cylinder set ids and names into object so name is always with the
+          // correct id
+          // @TODO Check if we can do this splitting in the SQL query instead of in JS. Maybe 
+          // MariaDB supports returning JSON arrays?
+          cylinderSetIds: String(row.cylinderSetIds).split('||'),
+          cylinderSetNames: String(row.cylinderSetNames).split('||'),
           price,
         };
       }),
@@ -153,6 +162,14 @@ export const createFillEvent = async (
       );
       if (sets.some((s) => s === undefined))
         throw new Error('Cylinder set not found');
+
+      // Verify the requesting user owns each cylinder set, or it is a club
+      // cylinder (accessible to all). This prevents linking another user's
+      // private cylinder set to the current user's fill event.
+      const unauthorised = sets.some(
+        (s) => s !== undefined && !s.isClubCylinder && s.owner !== user.id,
+      );
+      if (unauthorised) throw new Error('Cylinder set not found');
 
       const params: Array<string | null> = [user.id, gasMixture];
       const sql =

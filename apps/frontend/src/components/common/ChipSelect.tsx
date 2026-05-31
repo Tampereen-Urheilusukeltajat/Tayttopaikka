@@ -56,6 +56,18 @@ export const ChipSelect: React.FC<ChipSelectProps> = ({
           as="div"
           bsPrefix="chip-select-toggle"
           className={`form-control d-flex flex-column gap-2${errorText ? ' is-invalid' : ''}`}
+          role="combobox"
+          aria-expanded={open && !disabled}
+          aria-haspopup="listbox"
+          tabIndex={disabled ? -1 : 0}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (disabled) return;
+            if (e.key === ' ' || e.key === 'Enter') {
+              e.preventDefault();
+              setOpen((prev) => !prev);
+            }
+            if (e.key === 'Escape') setOpen(false);
+          }}
           style={{
             cursor: disabled ? 'default' : 'pointer',
             minHeight: '38px',
