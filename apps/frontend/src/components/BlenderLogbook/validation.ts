@@ -3,7 +3,7 @@ import { FIELD_NUMBER, FIELD_REQUIRED } from '../../lib/validationUtils';
 
 export const BLENDER_FILLING_EVENT_VALIDATION_SCHEMA = yup.object().shape({
   additionalInformation: yup.string().optional(),
-  divingCylinderSetId: yup.string().required(FIELD_REQUIRED),
+  divingCylinderSetIds: yup.array().of(yup.string()).min(1, FIELD_REQUIRED),
   gasMixture: yup.string().required(FIELD_REQUIRED),
   heliumPercentage: yup
     .number()

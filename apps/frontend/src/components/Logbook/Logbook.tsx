@@ -46,10 +46,14 @@ export const NewFillingEvent: React.FC<NewFillingEventProps> = ({
     values: FormFields,
     helpers: FormikHelpers<FormFields>,
   ): Promise<void> => {
+    // TODO: Logbook creates one fill event per cylinder set. This should be
+    // updated to create a single fill event with all selected cylinder sets,
+    // matching the BlenderLogbook behaviour. Partially-failed multi-set submits
+    // (first call succeeds, second fails) currently leave orphaned fill events.
     for (const divingCylinderSetId of values.divingCylinderSetIds) {
       fillEventMutation.mutate(
         {
-          cylinderSetId: divingCylinderSetId,
+          cylinderSetIds: [divingCylinderSetId],
           gasMixture: 'EAN21',
           filledAir: true,
           description: values.additionalInformation,

@@ -45,7 +45,7 @@ type NewFillingEventProps = {
 
 type FillingEventBasicInfo = {
   additionalInformation: string;
-  divingCylinderSetId: string;
+  divingCylinderSetIds: string[];
   gasMixture: AvailableMixtures;
   heliumPercentage: string;
   oxygenPercentage: string;
@@ -109,10 +109,10 @@ const computeTotalFillCostCents = (
   return calcTotalFillCostCents(gasCostsCents, diluentCostsCents);
 };
 
-// TODO find a better way to initialize divingCylinderSetId
+// TODO find a better way to initialize divingCylinderSetIds
 const EMPTY_FILLING_EVENT_BASIC_INFO: FillingEventBasicInfo = {
   additionalInformation: '',
-  divingCylinderSetId: '',
+  divingCylinderSetIds: [],
   heliumPercentage: '0',
   gasMixture: AvailableMixtureCompositions[0].id,
   oxygenPercentage: '21',
@@ -196,7 +196,7 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
 
       fillEventMutation.mutate(
         {
-          cylinderSetId: values.divingCylinderSetId,
+          cylinderSetIds: values.divingCylinderSetIds,
           description: values.additionalInformation,
           filledAir,
           gasMixture: formalizedGasMixture,
@@ -240,7 +240,7 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
       <Formik
         initialValues={{
           ...EMPTY_FILLING_EVENT_BASIC_INFO,
-          divingCylinderSetId: divingCylinderSets[0]?.id ?? '',
+          divingCylinderSetIds: [] as string[],
           compressorId: compressors[0].id ?? '',
           diluentFillingRows: [] as DiluentFillingRow[],
           fillingEventRows: [

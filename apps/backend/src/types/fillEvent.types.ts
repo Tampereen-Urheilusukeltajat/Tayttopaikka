@@ -16,7 +16,7 @@ export const fillEvent = Type.Object({
 export type FillEvent = Static<typeof fillEvent>;
 
 export const createFillEventBody = Type.Object({
-  cylinderSetId: Type.String({ format: 'uuid' }),
+  cylinderSetIds: Type.Array(Type.String({ format: 'uuid' }), { minItems: 1 }),
   gasMixture: Type.String({ maxLength: 124 }),
   filledAir: Type.Boolean(),
   storageCylinderUsageArr: Type.Array(storageCylinderUsage),
@@ -31,7 +31,7 @@ export type CreateFillEventBody = Static<typeof createFillEventBody>;
 export const fillEventResponse = Type.Object({
   id: Type.Integer({ minimum: 0 }),
   userId: Type.String({ format: 'uuid' }),
-  cylinderSetId: Type.String({ format: 'uuid' }),
+  cylinderSetIds: Type.Array(Type.String({ format: 'uuid' })),
   gasMixture: Type.String({ maxLength: 124 }),
   storageCylinderUsageArr: Type.Array(storageCylinderUsage),
   description: Type.Optional(Type.String({ maxLength: 1024 })),
@@ -53,8 +53,8 @@ export type FillEventGasFill = Static<typeof fillEventGasFill>;
 export const getFillEventsResponse = Type.Object({
   id: Type.String(),
   userId: Type.String({ format: 'uuid' }),
-  cylinderSetId: Type.String({ format: 'uuid' }),
-  cylinderSetName: Type.String(),
+  cylinderSetIds: Type.Array(Type.String({ format: 'uuid' })),
+  cylinderSetNames: Type.Array(Type.String()),
   gasMixture: Type.String(),
   description: Type.Optional(Type.String({ maxLength: 1024 })),
   price: Type.Integer({ minimum: 0 }),
