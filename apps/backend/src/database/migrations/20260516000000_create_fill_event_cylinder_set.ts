@@ -17,6 +17,23 @@ import { type Knex } from 'knex';
  * following migration (20260516000001_deprecate_fill_event_cylinder_set_id).
  */
 export async function up(knex: Knex): Promise<void> {
+  // Pre-check: every fill_event must have a non-null cylinder_set_id.
+  // If any are null it means production data is in an unexpected state and
+  // the migration should be aborted rather than silently skipping those rows.
+  const [nullRows] = await knex.raw<[Array<{ count: number }>]>(
+    'SELECT COUNT(*) as count FROM fill_event WHERE cylinder_set_id IS NULL',
+  );
+  if (nullRows[0].count > 0) {
+    throw new Error(
+      `Migration aborted: ${String(nullRows[0].count)} fill_event row(s) have NULL cylinder_set_id. ` +
+        'Expected zero — investigate before re-running.',
+    );
+  }
+
+  const [totalFillEvents] = await knex.raw<[Array<{ count: number }>]>(
+    'SELECT COUNT(*) as count FROM fill_event',
+  );
+
   await knex.raw(`
     CREATE TABLE fill_event_cylinder_set (
       fill_event_id   INT UNSIGNED NOT NULL,
@@ -39,6 +56,19 @@ export async function up(knex: Knex): Promise<void> {
     FROM fill_event
     WHERE cylinder_set_id IS NOT NULL
   `);
+
+  // Post-check: the backfill must have produced exactly one join-table row per
+  // fill event. A mismatch means the INSERT was incomplete or data is corrupt.
+  const [joinRows] = await knex.raw<[Array<{ count: number }>]>(
+    'SELECT COUNT(*) as count FROM fill_event_cylinder_set',
+  );
+  if (joinRows[0].count !== totalFillEvents[0].count) {
+    throw new Error(
+      `Migration aborted: fill_event has ${String(totalFillEvents[0].count)} row(s) but ` +
+        `fill_event_cylinder_set has ${String(joinRows[0].count)} row(s) after backfill. ` +
+        'Expected counts to be equal.',
+    );
+  }
 }
 
 export async function down(knex: Knex): Promise<void> {
