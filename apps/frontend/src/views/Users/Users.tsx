@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useUsersQuery } from '../../lib/queries/userQuery';
 
 import {
@@ -61,6 +62,8 @@ export const UsersPage: React.FC = () => {
   const { data } = useUsersQuery();
   const { mutate: updateUserRoles } = useUserRolesMutation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterNonMembers = searchParams.get('isUser') === 'false';
 
   const onCheckboxChange = useCallback(
     (userId: string, column: keyof UserRoles, currentValue: boolean) => {
@@ -92,12 +95,14 @@ export const UsersPage: React.FC = () => {
   );
 
   const filteredUserData = useMemo(() => {
+    const base = filterNonMembers ? userData.filter((u) => !u.isUser) : userData;
+
     if (!searchQuery.trim()) {
-      return userData;
+      return base;
     }
 
     const query = searchQuery.toLowerCase();
-    return userData.filter((user) => {
+    return base.filter((user) => {
       const fullName = `${user.surname} ${user.forename}`.toLowerCase();
       const email = user.email.toLowerCase();
       const phoneNumber = user.phoneNumber?.toLowerCase() ?? '';
@@ -108,7 +113,19 @@ export const UsersPage: React.FC = () => {
         phoneNumber.includes(query)
       );
     });
-  }, [userData, searchQuery]);
+  }, [userData, searchQuery, filterNonMembers]);
+
+  const toggleNonMemberFilter = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (filterNonMembers) {
+        next.delete('isUser');
+      } else {
+        next.set('isUser', 'false');
+      }
+      return next;
+    });
+  }, [filterNonMembers, setSearchParams]);
 
   const userColumns = useMemo(
     () => [
@@ -247,7 +264,7 @@ export const UsersPage: React.FC = () => {
       </div>
       <div className="mt-4">
         <h2>Käyttäjälistaus</h2>
-        <div className="mb-3">
+        <div className="mb-3 d-flex flex-row align-items-center gap-3">
           <input
             type="text"
             placeholder="Hae nimellä, sähköpostilla tai puhelinnumerolla..."
@@ -256,6 +273,18 @@ export const UsersPage: React.FC = () => {
             className="form-control"
             style={{ maxWidth: '500px' }}
           />
+          <div className="form-check mb-0">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="filterNonMembers"
+              checked={filterNonMembers}
+              onChange={toggleNonMemberFilter}
+            />
+            <label className="form-check-label" htmlFor="filterNonMembers">
+              Näytä vain epäjäsenet
+            </label>
+          </div>
         </div>
         <CommonTableV2 table={userTable} />
       </div>
