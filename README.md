@@ -92,6 +92,30 @@ flyctl deploy --config infra/backend/fly.toml --dockerfile infra/backend/Dockerf
 - Frontend: [infra/ui/fly.toml](infra/ui/fly.toml)
 - Backend: [infra/backend/fly.toml](infra/backend/fly.toml)
 
+## Development Workflow
+
+New features and significant changes follow a spec-driven workflow using [OpenSpec](https://openspec.dev). This keeps changes planned and documented before code is written.
+
+### Slash commands (Claude Code)
+
+| Command | Purpose |
+| ------- | ------- |
+| `/opsx:explore` | Explore ideas and read code — no implementation |
+| `/opsx:propose <name>` | Create a change with proposal, design, and tasks |
+| `/opsx:apply [name]` | Implement the tasks in a change |
+| `/opsx:archive [name]` | Archive a completed change |
+
+### Typical flow
+
+```text
+1. /opsx:explore          # Discuss the problem, read relevant code
+2. /opsx:propose <name>   # Generate proposal.md + design.md + tasks.md
+3. /opsx:apply            # Implement task by task
+4. /opsx:archive          # Archive when done
+```
+
+Change artifacts are stored in `openspec/changes/`. Project context for the AI is configured in `openspec/config.yaml`.
+
 ## License
 
 This project is licensed under the GNU AFFERO GENERAL PUBLIC LICENSE — see the LICENSE file for details.
