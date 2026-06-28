@@ -1,0 +1,12 @@
+schema: spec-driven
+
+context: |
+  See CLAUDE.md in the repository root for full project context, tech stack, domain knowledge, and coding rules.
+
+rules:
+  tasks:
+    - Break tasks into chunks of max 2 hours
+    - Each task should be independently testable or verifiable
+  proposal:
+    - Always include a "Non-goals" section
+    - Note if the change touches migrations or pricing logic (these need extra care)
