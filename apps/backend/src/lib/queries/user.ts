@@ -95,7 +95,7 @@ export const getUserWithEmail = async (
 export const getUserDetailsForLogin = async (
   email: string,
 ): Promise<UserLoginResponse | undefined> => {
-  const res = await knexController.raw<UserLoginResponse[]>(
+  const res = await knexController.raw<DBResponse<UserLoginResponse[]>>(
     `
         SELECT
           u.id,
