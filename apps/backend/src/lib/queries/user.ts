@@ -4,6 +4,7 @@ import {
   type UserRoles,
   type User,
   type UserResponse,
+  type MinifiedUserResponse,
 } from '../../types/user.types';
 import { type DBResponse } from '../../types/general.types';
 
@@ -147,6 +148,56 @@ export const updateUser = async (
 
   await db.commit();
   return editedUser;
+};
+
+export type RecentlyRegisteredUser = MinifiedUserResponse & { createdAt: Date };
+
+export const getRecentlyRegisteredUsers = async (): Promise<
+  RecentlyRegisteredUser[]
+> => {
+  const res = await knexController.raw<DBResponse<RecentlyRegisteredUser[]>>(
+    `
+    SELECT
+      u.id,
+      u.forename,
+      u.surname,
+      u.email,
+      u.created_at AS createdAt
+    FROM user u
+    WHERE
+      u.deleted_at IS NULL
+      AND u.created_at >= NOW() - INTERVAL 24 HOUR
+    ORDER BY u.created_at ASC
+    `,
+  );
+  return [...res[0]];
+};
+
+export type AdminNotificationRecipient = {
+  id: string;
+  forename: string;
+  email: string;
+};
+
+export const getAdminUsers = async (): Promise<
+  AdminNotificationRecipient[]
+> => {
+  const res = await knexController.raw<
+    DBResponse<AdminNotificationRecipient[]>
+  >(
+    `
+    SELECT
+      u.id,
+      u.forename,
+      u.email
+    FROM user u
+    WHERE
+      u.deleted_at IS NULL
+      AND u.archived_at IS NULL
+      AND u.is_admin = true
+    `,
+  );
+  return [...res[0]];
 };
 
 export const updateLastLogin = async (
