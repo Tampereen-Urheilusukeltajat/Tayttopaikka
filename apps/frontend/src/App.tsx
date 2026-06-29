@@ -26,6 +26,7 @@ import { InvoicePage } from './views/Invoice/Invoice';
 import { UsersPage } from './views/Users/Users';
 import { ArchivedUsersPage } from './views/ArchivedUsers/ArchivedUsers';
 import { GasPrices } from './views/GasPrices/GasPrices';
+import { SiteNotices } from './views/SiteNotices/SiteNotices';
 
 const QUERY_CLIENT = new QueryClient();
 
@@ -89,6 +90,7 @@ const Content: React.FC = () => {
             <Route path="users" element={<UsersPage />} />
             <Route path="archived-users" element={<ArchivedUsersPage />} />
             <Route path="gas-prices" element={<GasPrices />} />
+            <Route path="notices" element={<SiteNotices />} />
           </Route>
 
           {/* 404 */}
