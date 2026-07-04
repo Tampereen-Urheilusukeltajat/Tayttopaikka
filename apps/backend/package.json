@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "nodemon",
     "start": "ts-node --transpile-only ./src/app.ts",
-    "test": "tsx --test",
-    "test:coverage": "tsx --test --experimental-test-coverage",
-    "test:watch": "tsx --test --test-concurrency=1 --watch",
+    "test": "tsx --experimental-test-module-mocks --test",
+    "test:coverage": "tsx --experimental-test-module-mocks --test --experimental-test-coverage",
+    "test:watch": "tsx --experimental-test-module-mocks --test --test-concurrency=1 --watch",
     "lint": "eslint src --max-warnings 0",
     "format": "prettier -c .",
     "check-types": "tsc --noEmit",

@@ -13,6 +13,8 @@ import {
 } from '../../types/user.types';
 import { getUserWithId, updateUsersRoles } from '../../lib/queries/user';
 import { errorHandler } from '../../lib/utils/errorHandler';
+import { sendUserStatusChangedEmail } from '../../lib/utils/accessRightsChangeEmails';
+import { log } from '../../lib/utils/log';
 
 const editUserSchema = {
   description: 'Update users roles',
@@ -45,6 +47,18 @@ const handler = async (
   }
 
   const updatedUser = await updateUsersRoles(userId, req.body);
+
+  if (user.isUser !== updatedUser.isUser) {
+    try {
+      await sendUserStatusChangedEmail(updatedUser, updatedUser.isUser);
+    } catch (error) {
+      log.error(
+        `Failed to send isUser status change notification to user ${updatedUser.id}`,
+        error,
+      );
+    }
+  }
+
   return reply.send(updatedUser);
 };
 
