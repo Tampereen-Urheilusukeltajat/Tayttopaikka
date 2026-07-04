@@ -16,11 +16,11 @@ const buildActivationEmail = (
   subject: 'Käyttäjätilisi on aktivoitu',
   text: `Hei ${user.forename},
 
-Ylläpitäjä on aktivoinut käyttäjätilisi Täyttöpaikka-palvelussa. Voit nyt kirjautua sisään ja käyttää sovellusta.
+Ylläpitäjä on aktivoinut käyttäjätilisi Täyttöpaikka-palvelussa. Voit nyt kirjata täyttöjä ja käyttää sovelluksen muita toimintoja.
 
 Jos olet jo kirjautuneena sisään, kirjaudu ensin ulos ja sen jälkeen takaisin sisään, jotta uudet oikeutesi tulevat voimaan.
 
-Kirjaudu sisään: ${LOGIN_URL}
+Siirry sovellukseen: ${LOGIN_URL}
 
 Terveisin,
 Täyttöpaikka-järjestelmä`,
@@ -32,7 +32,7 @@ const buildDeactivationEmail = (
   subject: 'Käyttöoikeutesi on poistettu',
   text: `Hei ${user.forename},
 
-Ylläpitäjä on poistanut käyttöoikeutesi Täyttöpaikka-palvelusta. Et voi enää kirjautua sisään sovellukseen.
+Ylläpitäjä on poistanut käyttöoikeutesi Täyttöpaikka-palvelusta. Et voi enää tehdä kirjauksia uusista täytöistä tai käyttää sovelluksen muita toimintoja.
 
 Mikäli tämä on mielestäsi virhe, ole hyvä ja ota yhteyttä seuran ylläpitoon.
 
