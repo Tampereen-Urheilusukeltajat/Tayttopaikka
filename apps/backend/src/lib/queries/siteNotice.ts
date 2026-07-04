@@ -6,6 +6,7 @@ import {
   type SiteNoticeWithPoster,
   type UpdateSiteNoticeBody,
 } from '../../types/siteNotice.types';
+import { type DBResponse } from '../../types/general.types';
 
 const NOTICE_COLUMNS = [
   'sn.id',
@@ -26,7 +27,7 @@ const NOTICE_WITH_POSTER_COLUMNS = [
 export const getActiveNotices = async (): Promise<SiteNotice[]> => {
   const now = new Date(Date.now());
 
-  const res = await knexController.raw<SiteNotice[][]>(
+  const [rows] = await knexController.raw<DBResponse<SiteNotice[]>>(
     `SELECT ${NOTICE_COLUMNS}
      FROM site_notice sn
      WHERE sn.active_from <= :now
@@ -35,18 +36,18 @@ export const getActiveNotices = async (): Promise<SiteNotice[]> => {
     { now },
   );
 
-  return res[0] ?? [];
+  return rows ?? [];
 };
 
 export const getAllNotices = async (): Promise<SiteNoticeWithPoster[]> => {
-  const res = await knexController.raw<SiteNoticeWithPoster[][]>(
+  const [rows] = await knexController.raw<DBResponse<SiteNoticeWithPoster[]>>(
     `SELECT ${NOTICE_WITH_POSTER_COLUMNS}
      FROM site_notice sn
      JOIN user u ON sn.created_by = u.id
      ORDER BY sn.active_from DESC`,
   );
 
-  return res[0] ?? [];
+  return rows ?? [];
 };
 
 export const createNotice = async (
@@ -83,12 +84,12 @@ export const createNotice = async (
 export const getNoticeById = async (
   id: string,
 ): Promise<SiteNotice | undefined> => {
-  const res = await knexController.raw<SiteNotice[][]>(
+  const [rows] = await knexController.raw<DBResponse<SiteNotice[]>>(
     `SELECT ${NOTICE_COLUMNS} FROM site_notice sn WHERE sn.id = :id`,
     { id },
   );
 
-  return res[0][0];
+  return rows[0];
 };
 
 export const updateNotice = async (
