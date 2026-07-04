@@ -92,6 +92,12 @@ export const Navbar: React.FC = () => {
                   >
                     Kaasujen hinnat
                   </CustomLink>
+                  <CustomLink
+                    className={styles.dropdownLink}
+                    to="/admin/notices"
+                  >
+                    Ilmoitukset
+                  </CustomLink>
                   {/* <CustomLink
                     className={styles.dropdownLink}
                     to="/admin/filling-history"

@@ -67,6 +67,7 @@ const TABLE_READ_ORDER = [
   'fill_event_cylinder_set',
   'payment_event',
   'fill_event_payment_event',
+  'site_notice',
 ];
 
 const deriveReadOrder = (tableNames: string[]): string[] => {

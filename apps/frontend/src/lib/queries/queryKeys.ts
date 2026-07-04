@@ -29,3 +29,7 @@ export const INVOICE_QUERY_KEY = ['invoice'];
 
 // Payment events
 export const PAYMENT_EVENTS_QUERY_KEY = ['paymentEvents'];
+
+// Site notices
+export const NOTICES_QUERY_KEY = ['notices'];
+export const ADMIN_NOTICES_QUERY_KEY = ['adminNotices'];
