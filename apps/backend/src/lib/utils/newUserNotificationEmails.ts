@@ -11,7 +11,7 @@ if (!FRONTEND_HOSTNAME) {
   throw new Error('FRONTEND_HOSTNAME environment variable is required');
 }
 
-const ADMIN_USERS_URL = `${FRONTEND_HOSTNAME}/admin/users?isUser=false`;
+const ADMIN_USERS_URL = `https://${FRONTEND_HOSTNAME}/admin/users?isUser=false`;
 
 const formatFinnishDateTime = (date: Date): string =>
   date.toLocaleString('fi-FI', {
