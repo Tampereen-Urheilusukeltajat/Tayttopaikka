@@ -24,21 +24,23 @@ These rules take priority over any general TypeScript conventions:
 
 There are exactly 5 gases, inserted by migration and never changed:
 
-| id | name    | Notes |
-|----|---------|-------|
-| 1  | Air     | Always free — bypasses cost calculation entirely |
-| 2  | Helium  | Charged per litre |
-| 3  | Oxygen  | Charged per litre |
-| 4  | Argon   | Charged per litre |
-| 5  | Diluent | Price derived from O₂% + He% composition — no fixed per-litre price stored |
+| id  | name    | Notes                                                                                 |
+| --- | ------- | ------------------------------------------------------------------------------------- |
+| 1   | Air     | Always free — bypasses cost calculation entirely                                      |
+| 2   | Helium  | Charged per litre                                                                     |
+| 3   | Oxygen  | Charged per litre                                                                     |
+| 4   | Argon   | Charged per litre                                                                     |
+| 5   | Diluent | Price derived from He% composition only — O₂ is free; no fixed per-litre price stored |
 
 **Never add pricing logic to air fills.** Air's `gas_price` row exists in the DB but its value is ignored. The admin UI hides the edit button for Air (and Diluent) and the backend rejects price changes for them with 400.
 
 **Diluent price** is always computed as:
+
 ```
-price_eur_cents = ceil((o2% / 100 × o2Price + he% / 100 × hePrice) × volumeLitres)
+price_eur_cents = ceil((he% / 100 × hePrice) × volumeLitres)
 ```
-The `ceil` ensures a whole number of cents.
+
+Oxygen content is not charged. The `ceil` ensures a whole number of cents.
 
 ### Pricing invariants
 
@@ -53,13 +55,13 @@ The `ceil` ensures a whole number of cents.
 
 Roles are boolean flags on the user row (not an enum):
 
-| Flag | Capabilities |
-|------|-------------|
-| `isAdmin` | Full access including gas price management, invoicing |
-| `isAdvancedBlender` | Planned — not yet in use |
-| `isBlender` | Can fill basic gas mixes |
-| `isInstructor` | Instructor-specific features |
-| `isUser` | Base access (own fills, own cylinder sets) |
+| Flag                | Capabilities                                          |
+| ------------------- | ----------------------------------------------------- |
+| `isAdmin`           | Full access including gas price management, invoicing |
+| `isAdvancedBlender` | Planned — not yet in use                              |
+| `isBlender`         | Can fill basic gas mixes                              |
+| `isInstructor`      | Instructor-specific features                          |
+| `isUser`            | Base access (own fills, own cylinder sets)            |
 
 Only users with `isBlender`, `isAdvancedBlender`, or `isAdmin` can submit storage cylinder usage. Regular users can only record air fills (which are free).
 
@@ -176,13 +178,13 @@ All substantial new features and changes follow a spec-driven workflow using the
 
 ### Slash commands
 
-| Command | Purpose |
-|---------|---------|
-| `/opsx:explore` | Thinking mode — read code, discuss ideas, no implementation |
+| Command                | Purpose                                                        |
+| ---------------------- | -------------------------------------------------------------- |
+| `/opsx:explore`        | Thinking mode — read code, discuss ideas, no implementation    |
 | `/opsx:propose <name>` | Create a new change with proposal, design, and tasks artifacts |
-| `/opsx:apply [name]` | Implement tasks from an existing change |
-| `/opsx:archive [name]` | Archive a completed change |
-| `/opsx:sync` | Sync specs with current codebase state |
+| `/opsx:apply [name]`   | Implement tasks from an existing change                        |
+| `/opsx:archive [name]` | Archive a completed change                                     |
+| `/opsx:sync`           | Sync specs with current codebase state                         |
 
 ### Typical workflow
 
