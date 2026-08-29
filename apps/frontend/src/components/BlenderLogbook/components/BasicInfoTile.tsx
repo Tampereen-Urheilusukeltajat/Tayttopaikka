@@ -13,11 +13,6 @@ import { type Compressor } from '../../../lib/queries/compressorQuery';
 import { useFormikContext } from 'formik';
 import { ChipSelect } from '../../common/ChipSelect';
 
-enum FillingMethod {
-  PartialPressure = 'partial',
-  ContinuousFlow = 'continuous',
-}
-
 type BasicInfoTileProps = CommonTileProps & {
   divingCylinderSets: DivingCylinderSet[];
   clubCylinderSets?: DivingCylinderSet[];
@@ -33,18 +28,14 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
 }) => {
   const { setFieldValue } = useFormikContext();
   const [showClubCylinders, setShowClubCylinders] = useState(false);
-  const [fillingMethod, setFillingMethod] = useState<FillingMethod>(
-    FillingMethod.ContinuousFlow,
-  );
+  const [compressorUsed, setCompressorUsed] = useState(true);
 
   const selectedMixture = AvailableMixtureCompositions.find(
     (m) => m.id === values.gasMixture,
   );
   const isArgonSelected = values.gasMixture === AvailableMixtures.Argon;
-  // Argon is always filled by partial pressure, regardless of the last method the user picked.
-  const effectiveFillingMethod = isArgonSelected
-    ? FillingMethod.PartialPressure
-    : fillingMethod;
+  // A compressor can never be linked to an Argon fill, regardless of what the user picked.
+  const effectiveCompressorUsed = isArgonSelected ? false : compressorUsed;
 
   useEffect(() => {
     if (!selectedMixture?.fixedComposition) return;
@@ -59,16 +50,14 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
   }, [selectedMixture, setFieldValue]);
 
   // TODO: there is currently only one continuous-flow compressor, so it's
-  // auto-selected without asking the user. If a club ever configures more
-  // than one, replace this with a compressor picker.
+  // auto-linked without asking the user which one. If a club ever configures
+  // more than one, replace this with a compressor picker.
   useEffect(() => {
     void setFieldValue(
       'compressorId',
-      effectiveFillingMethod === FillingMethod.ContinuousFlow
-        ? compressors[0]?.id ?? ''
-        : '',
+      effectiveCompressorUsed ? compressors[0]?.id ?? '' : '',
     );
-  }, [effectiveFillingMethod, compressors, setFieldValue]);
+  }, [effectiveCompressorUsed, compressors, setFieldValue]);
 
   const orderedCylinderSets = divingCylinderSets.sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { numeric: true }),
@@ -138,24 +127,19 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
             }
             style={{ minWidth: '180px' }}
           />
-          <div className="d-flex flex-column gap-1">
-            <span className="field-title">Täyttötapa</span>
-            <Form.Check
-              type="radio"
-              id="filling-method-continuous"
-              label="Jatkuvan virtauksen täyttö"
-              checked={effectiveFillingMethod === FillingMethod.ContinuousFlow}
+          <div className="inputField">
+            <label className="field-title" htmlFor="compressor-used">
+              Käynnistyikö kompura täytön aikana?
+            </label>
+            <Form.Select
+              id="compressor-used"
+              value={effectiveCompressorUsed ? 'yes' : 'no'}
               disabled={values.userConfirm || isArgonSelected}
-              onChange={() => setFillingMethod(FillingMethod.ContinuousFlow)}
-            />
-            <Form.Check
-              type="radio"
-              id="filling-method-partial"
-              label="Osapainetäyttö"
-              checked={effectiveFillingMethod === FillingMethod.PartialPressure}
-              disabled={values.userConfirm}
-              onChange={() => setFillingMethod(FillingMethod.PartialPressure)}
-            />
+              onChange={(e) => setCompressorUsed(e.target.value === 'yes')}
+            >
+              <option value="yes">Kyllä</option>
+              <option value="no">Ei</option>
+            </Form.Select>
           </div>
           <TextInput
             disabled={values.userConfirm}
