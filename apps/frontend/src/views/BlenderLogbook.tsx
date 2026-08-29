@@ -31,10 +31,9 @@ export const BlenderLogbook = (): JSX.Element => {
         gases &&
         gases.length > 0 &&
         divingCylinderSets &&
-        divingCylinderSets.length > 0 &&
-        compressors.length > 0) ??
+        divingCylinderSets.length > 0) ??
       false,
-    [compressors, divingCylinderSets, gases, storageCylinders],
+    [divingCylinderSets, gases, storageCylinders],
   );
 
   const anyErrors = useMemo(

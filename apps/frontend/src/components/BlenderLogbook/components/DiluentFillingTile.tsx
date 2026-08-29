@@ -9,10 +9,7 @@ import {
   calculateVolumeLitres,
   eurCentsToEur,
 } from '@tayttopaikka/pricing';
-import {
-  AvailableGasses,
-  AvailableMixtures,
-} from '../../../lib/utils';
+import { AvailableGasses, AvailableMixtures } from '../../../lib/utils';
 import {
   ButtonType,
   ElementButton,
@@ -20,7 +17,10 @@ import {
 } from '../../common/Button/Buttons';
 import { DropdownMenu, TextInput } from '../../common/Inputs';
 import styles from './FillingTile.module.scss';
-import { type CommonTileProps, emptyDiluentFillingRow } from '../BlenderLogbook';
+import {
+  type CommonTileProps,
+  emptyDiluentFillingRow,
+} from '../BlenderLogbook';
 
 type DiluentRow = {
   startPressure: number;
@@ -36,13 +36,27 @@ const calcDiluentRowPriceEur = (
   hePriceCents: number,
 ): number => {
   if (!cylinder) return 0;
-  const totalVolumeLitres = calculateVolumeLitres(cylinder.volume, row.startPressure, row.endPressure);
-  return eurCentsToEur(calcDiluentFillCostCents(totalVolumeLitres, Number(row.heliumPercentage), hePriceCents));
+  const totalVolumeLitres = calculateVolumeLitres(
+    cylinder.volume,
+    row.startPressure,
+    row.endPressure,
+  );
+  return eurCentsToEur(
+    calcDiluentFillCostCents(
+      totalVolumeLitres,
+      Number(row.heliumPercentage),
+      hePriceCents,
+    ),
+  );
 };
 
 type ReadOnlyFieldProps = { label: string; value: number; unit: string };
 
-const ReadOnlyField: React.FC<ReadOnlyFieldProps> = ({ label, value, unit }) => (
+const ReadOnlyField: React.FC<ReadOnlyFieldProps> = ({
+  label,
+  value,
+  unit,
+}) => (
   <div className="inputField">
     <label className="field-title">{label}</label>
     <InputGroup>
@@ -68,16 +82,29 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
   gases,
 }) => {
   const row = values.diluentFillingRows.at(index);
-  const cylinder = diluentCylinders.find((sc) => sc.id === row?.storageCylinderId);
-  const hePriceCents = gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
+  const cylinder = diluentCylinders.find(
+    (sc) => sc.id === row?.storageCylinderId,
+  );
+  const hePriceCents =
+    gases.find((g) => g.gasName === AvailableGasses.helium)?.priceEurCents ?? 0;
 
   const totalVolumeLitres =
-    cylinder && row ? calculateVolumeLitres(cylinder.volume, row.startPressure, row.endPressure) : 0;
+    cylinder && row
+      ? calculateVolumeLitres(
+          cylinder.volume,
+          row.startPressure,
+          row.endPressure,
+        )
+      : 0;
 
   const hePct = Number(row?.heliumPercentage ?? 0);
-  const heVolumeLitres = (hePct / 100) * totalVolumeLitres;
+  const heVolumeLitres = parseFloat(
+    ((hePct / 100) * totalVolumeLitres).toFixed(2),
+  );
 
-  const priceEur = row ? calcDiluentRowPriceEur(row, cylinder, hePriceCents) : 0;
+  const priceEur = row
+    ? calcDiluentRowPriceEur(row, cylinder, hePriceCents)
+    : 0;
 
   return (
     <div className={styles.fillingRow}>
@@ -90,23 +117,23 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
       </div>
 
       <DropdownMenu
-          disabled={values.userConfirm}
-          label="Diluenttipullo"
-          name={`diluentFillingRows.${index}.storageCylinderId`}
-          errorText={errors.diluentFillingRows?.at(index)?.storageCylinderId}
-        >
-          {diluentCylinders.map((sc) => (
-            <option
-              disabled={values.diluentFillingRows.some(
-                (r, i) => i !== index && r.storageCylinderId === sc.id,
-              )}
-              key={sc.id}
-              value={sc.id}
-            >
-              {sc.name}
-            </option>
-          ))}
-        </DropdownMenu>
+        disabled={values.userConfirm}
+        label="Diluenttipullo"
+        name={`diluentFillingRows.${index}.storageCylinderId`}
+        errorText={errors.diluentFillingRows?.at(index)?.storageCylinderId}
+      >
+        {diluentCylinders.map((sc) => (
+          <option
+            disabled={values.diluentFillingRows.some(
+              (r, i) => i !== index && r.storageCylinderId === sc.id,
+            )}
+            key={sc.id}
+            value={sc.id}
+          >
+            {sc.name}
+          </option>
+        ))}
+      </DropdownMenu>
 
       <TextInput
         disabled={values.userConfirm}
@@ -144,7 +171,11 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
 };
 
 type DiluentFillingTileProps = CommonTileProps & {
-  setFieldValue: (field: string, value: unknown, shouldValidate?: boolean) => void;
+  setFieldValue: (
+    field: string,
+    value: unknown,
+    shouldValidate?: boolean,
+  ) => void;
   diluentCylinders: StorageCylinder[];
   gases: GasWithPricing[];
 };
@@ -156,17 +187,19 @@ export const DiluentFillingTile: React.FC<DiluentFillingTileProps> = ({
   diluentCylinders,
   gases,
 }) => {
-  const isTrimixLike =
-    values.gasMixture === AvailableMixtures.Trimix ||
-    values.gasMixture === AvailableMixtures.Heliox;
-
-  if (!isTrimixLike) return null;
-  if (diluentCylinders.length === 0) return null;
+  const isTrimixSelected = values.gasMixture === AvailableMixtures.Trimix;
+  const hasFreeDiluentCylinder =
+    values.diluentFillingRows.length < diluentCylinders.length;
+  const addRowDisabled =
+    values.userConfirm || !isTrimixSelected || !hasFreeDiluentCylinder;
+  const addRowTooltip = !isTrimixSelected
+    ? 'Valitse TRIMIX täyttääksesi diluenttipankista'
+    : undefined;
 
   return (
     <div className="pt-3 pb-3 border-bottom">
       <div className="d-flex align-items-center gap-2 mb-2">
-        <h2 className="mb-0">Diluenttitäyttö</h2>
+        <h2 className="mb-0">Täyttö diluenttipankista</h2>
         <OverlayTrigger
           trigger="click"
           placement="right"
@@ -176,9 +209,9 @@ export const DiluentFillingTile: React.FC<DiluentFillingTileProps> = ({
               <Popover.Header>Hinnan laskenta</Popover.Header>
               <Popover.Body>
                 <p className="mb-2">
-                  <strong>Täyttö:</strong> Valitse varastopullo, syötä sen kaasun koostumus
-                  (O₂% ja He%) sekä varastopullon paine ennen ja jälkeen täytön.
-                  Hinta lasketaan automaattisesti.
+                  <strong>Täyttö:</strong> Valitse varastopullo, syötä sen
+                  kaasun koostumus (O₂% ja He%) sekä varastopullon paine ennen
+                  ja jälkeen täytön. Hinta lasketaan automaattisesti.
                 </p>
                 <hr className="my-2" />
                 <p className="mb-1">
@@ -186,18 +219,22 @@ export const DiluentFillingTile: React.FC<DiluentFillingTileProps> = ({
                   <code>⌈He% × He-hinta × kulutus⌉</code>
                 </p>
                 <p className="mb-1">
-                  <strong>Kulutus</strong> = (lähtöpaine − loppupaine) × varastopullon tilavuus
+                  <strong>Kulutus</strong> = (lähtöpaine − loppupaine) ×
+                  varastopullon tilavuus
                 </p>
                 <p className="mb-1 text-muted" style={{ fontSize: '0.85em' }}>
                   Happea ei veloiteta — hinta perustuu vain heliumiin.
                 </p>
                 <hr className="my-2" />
                 <p className="mb-1">
-                  <strong>Esimerkki:</strong> Varastopullo analysoidaan ja sen koostumus on TRIMIX 21/35. Varastopullosta (50 l) otetaan kaasua 200→195 bar
+                  <strong>Esimerkki:</strong> Varastopullo analysoidaan ja sen
+                  koostumus on TRIMIX 21/35. Varastopullosta (50 l) otetaan
+                  kaasua 200→195 bar
                 </p>
                 <p className="mb-1">Kulutus: (200−195) × 50 = 250 l</p>
                 <p className="mb-0">
-                  ⌈0,35 × 12 snt × 250⌉ = ⌈1050⌉ = <strong>1050 snt = 10,50 €</strong>
+                  ⌈0,35 × 12 snt × 250⌉ = ⌈1050⌉ ={' '}
+                  <strong>1050 snt = 10,50 €</strong>
                 </p>
               </Popover.Body>
             </Popover>
@@ -212,6 +249,10 @@ export const DiluentFillingTile: React.FC<DiluentFillingTileProps> = ({
           </button>
         </OverlayTrigger>
       </div>
+      <p className="text-muted mb-2">
+        Diluenttipankin kautta tapahtuva täyttö vaatii kaasuseokseksi TRIMIXin. Lisää tietoa info-ikonia
+        klikkaamalla.
+      </p>
 
       <FieldArray name="diluentFillingRows">
         {({ remove, push }) => (
@@ -228,22 +269,26 @@ export const DiluentFillingTile: React.FC<DiluentFillingTileProps> = ({
               />
             ))}
             <div className={styles.addRow}>
-              {values.diluentFillingRows.length < diluentCylinders.length && (
-                <PrimaryButton
-                  disabled={values.userConfirm}
-                  onClick={() => {
-                    if (values.diluentFillingRows.length === 0) {
-                      void setFieldValue('diluentFillingRows', [
-                        emptyDiluentFillingRow(diluentCylinders, []),
-                      ]);
-                    } else {
-                      push(emptyDiluentFillingRow(diluentCylinders, values.diluentFillingRows));
-                    }
-                  }}
-                  type={ButtonType.button}
-                  text="Lisää diluenttitäyttö"
-                />
-              )}
+              <PrimaryButton
+                disabled={addRowDisabled}
+                tooltip={addRowTooltip}
+                onClick={() => {
+                  if (values.diluentFillingRows.length === 0) {
+                    void setFieldValue('diluentFillingRows', [
+                      emptyDiluentFillingRow(diluentCylinders, []),
+                    ]);
+                  } else {
+                    push(
+                      emptyDiluentFillingRow(
+                        diluentCylinders,
+                        values.diluentFillingRows,
+                      ),
+                    );
+                  }
+                }}
+                type={ButtonType.button}
+                text="Lisää diluenttipullo"
+              />
             </div>
           </>
         )}

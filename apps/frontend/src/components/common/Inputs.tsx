@@ -1,7 +1,8 @@
 import { Field } from 'formik';
 import { InputGroup } from 'react-bootstrap';
 import '../../styles/common/input.css';
-import React from 'react';
+import React, { useMemo } from 'react';
+import { Tooltip } from 'react-tooltip';
 
 export type CommonInputProps = {
   autoComplete?: string;
@@ -18,7 +19,8 @@ export type CommonInputProps = {
   opIgnore?: boolean;
 };
 
-export type SelectInputProps = CommonInputProps & React.PropsWithChildren;
+export type SelectInputProps = CommonInputProps &
+  React.PropsWithChildren & { tooltip?: string };
 
 export const TextInput: React.FC<CommonInputProps> = ({
   autoComplete,
@@ -75,13 +77,24 @@ export const DropdownMenu: React.FC<SelectInputProps> = ({
   label,
   name,
   placeholder,
+  tooltip,
   unit,
   type,
   opIgnore,
   ...props
 }) => {
+  const tooltipId = useMemo(
+    () => (tooltip ? crypto.randomUUID() : ''),
+    [tooltip],
+  );
+
   return (
-    <div {...props} className={`${className ?? ''} inputField`}>
+    <div
+      {...props}
+      className={`${className ?? ''} inputField`}
+      data-tooltip-id={tooltipId}
+      data-tooltip-content={tooltip}
+    >
       {label !== undefined ? (
         <label className="field-title" htmlFor={`id-${name}`}>
           {label}
@@ -92,7 +105,7 @@ export const DropdownMenu: React.FC<SelectInputProps> = ({
           id={`id-${name}`}
           as="select"
           className={`
-            form-select 
+            form-select
             ${errorText !== undefined ? 'is-invalid' : ''}`}
           disabled={disabled}
           name={name}
@@ -107,6 +120,7 @@ export const DropdownMenu: React.FC<SelectInputProps> = ({
         {unit !== undefined ? <InputGroup.Text>{unit}</InputGroup.Text> : null}
         <span className="errorSpace invalid-feedback">{errorText}</span>
       </InputGroup>
+      {tooltip && <Tooltip id={tooltipId} />}
     </div>
   );
 };

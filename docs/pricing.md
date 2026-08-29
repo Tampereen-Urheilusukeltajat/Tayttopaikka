@@ -2,7 +2,7 @@
 
 ## Overview
 
-Gas prices are stored as **euro cents per litre** (`FLOAT(6,2)`), giving a usable range of 0–9999.9 euro-cents/l (0–99.999 €/l) with up to 3 decimal places when expressed in euros (i.e. 0.001 €/l precision). Air is always free — not because its stored price is zero, but because air fills bypass cost calculation entirely (see [Recording a fill event](#5-recording-a-fill-event)). Diluent is a special gas whose price is never stored as a fixed per-litre value — it is computed dynamically from the oxygen and helium percentages of the mix (see [Diluent fills](#diluent-fills)).
+Gas prices are stored as **euro cents per litre** (`FLOAT(6,2)`), giving a usable range of 0–9999.9 euro-cents/l (0–99.999 €/l) with up to 3 decimal places when expressed in euros (i.e. 0.001 €/l precision). Air is always free — not because its stored price is zero, but because air fills bypass cost calculation entirely (see [Recording a fill event](#5-recording-a-fill-event)). Diluent is a special gas whose price is never stored as a fixed per-litre value — it is computed dynamically from the helium percentage of the mix (oxygen content is not charged; see [Diluent fills](#diluent-fills)).
 
 ---
 
@@ -12,13 +12,13 @@ Gas prices are stored as **euro cents per litre** (`FLOAT(6,2)`), giving a usabl
 
 Static lookup table. Five gases are inserted by migration and never change:
 
-| id | name    |
-|----|---------|
-| 1  | Air     |
-| 2  | Helium  |
-| 3  | Oxygen  |
-| 4  | Argon   |
-| 5  | Diluent |
+| id  | name    |
+| --- | ------- |
+| 1   | Air     |
+| 2   | Helium  |
+| 3   | Oxygen  |
+| 4   | Argon   |
+| 5   | Diluent |
 
 ### `gas_price`
 
@@ -50,7 +50,7 @@ fill_event_id | gas_price_id | storage_cylinder_id | volume_litres
 
 ### `fill_event_diluent_fill`
 
-Records diluent cylinder fills where price depends on gas composition. Unlike `fill_event_gas_fill` there is no single gas price to reference, so both the O2 and He `gas_price` IDs are stored for audit, and the pre-computed total cost is persisted so invoice queries stay simple.
+Records diluent cylinder fills where price depends on gas composition. Unlike `fill_event_gas_fill` there is no single gas price to reference. The schema has columns for both an oxygen and a helium `gas_price` reference, but only helium is currently charged — `oxygen_gas_price_id` is always `NULL` (oxygen is not billed; see [Diluent fills](#diluent-fills)). The pre-computed total cost is persisted so invoice queries stay simple.
 
 ```text
 fill_event_id | storage_cylinder_id | volume_litres | oxygen_percentage | helium_percentage | oxygen_gas_price_id | helium_gas_price_id | price_eur_cents
@@ -58,9 +58,9 @@ fill_event_id | storage_cylinder_id | volume_litres | oxygen_percentage | helium
 
 `price_eur_cents` here is the **total fill cost** (not per-litre), stored as `DECIMAL(12,2)`.
 
-Formula: `price_eur_cents = ceil((o2% / 100 × o2Price + he% / 100 × hePrice) × volumeLitres)`
+Formula: `price_eur_cents = ceil((he% / 100 × hePrice) × volumeLitres)`
 
-The `ceil` ensures the total is always a whole number of cents, guarding against sub-cent floating-point artefacts from composition arithmetic.
+Oxygen content is not charged. The `ceil` ensures the total is always a whole number of cents, guarding against sub-cent floating-point artefacts from composition arithmetic. `oxygen_percentage` and `helium_percentage` are still recorded (for composition audit) and are DB-constrained to `[0, 100]` with `oxygen_percentage + helium_percentage <= 100`.
 
 ---
 
@@ -104,7 +104,7 @@ Within a single transaction:
 
 1. Looks up the currently active `gas_price` row for each gas used, using `active_from <= NOW AND active_to > NOW`.
 2. Records `fill_event_gas_fill` rows that reference those `gas_price` ids directly — the price is **frozen at this point**.
-3. For diluent fills (`diluentCylinderUsageArr`): calls `getDiluentPrice` server-side with the storage cylinder ID and O2/He percentages, verifies the client-supplied `oxygenGasPriceId` and `heliumGasPriceId` still match the server's active prices, then inserts into `fill_event_diluent_fill` with the pre-computed total cost.
+3. For diluent fills (`diluentCylinderUsageArr`): validates the storage cylinder is actually a Diluent cylinder, computes the volume, looks up the currently active Helium `gas_price` server-side, computes the total cost (helium content only), and inserts into `fill_event_diluent_fill` with `oxygen_gas_price_id = NULL` and the pre-computed total cost.
 4. Calculates the total cost server-side (`calcTotalCost`: gas fills + diluent fills, result rounded up with `Math.ceil`) and compares it to the price the client submitted. Mismatch → 400.
 5. Air fills are free: `fill_event_gas_fill` rows for air have `storage_cylinder_id = NULL`. `calcTotalCost` returns 0 for those rows, and all invoice SQL queries exclude them.
 
@@ -112,7 +112,7 @@ Volume is calculated as `ceil(startPressure - endPressure) × cylinderVolume` li
 
 #### Diluent fills
 
-Diluent is a premixed gas (typically O2 + He + N2) dispensed from a dedicated storage cylinder. The cost is charged on the O2 and He content only — nitrogen is free. The blender supplies the O2% and He% of the mix. The frontend fetches the current per-litre price from `GET /api/gas/diluent-price` before submitting the fill event, and passes the returned `oxygenGasPriceId` / `heliumGasPriceId` with the request. The server re-validates those IDs match the currently active prices, preventing stale-price submissions.
+Diluent is a premixed gas (typically O2 + He + N2) dispensed from a dedicated storage cylinder. The cost is charged on the He content only — oxygen and nitrogen are free. The blender supplies the O2% and He% of the mix; O2% is recorded for composition audit but never billed. The frontend computes the estimated total client-side using the Helium price from the general gas price list (`GET /api/gas`) to display the price and to submit as the expected total. The server independently looks up the currently active Helium price and recomputes the cost, rejecting the request (400, price mismatch) if it doesn't match what the client submitted.
 
 ### 6. Invoicing
 
@@ -126,6 +126,7 @@ A fill event is **unpaid** when:
 It is considered **paid** when it has a linked `payment_event` with status `COMPLETED`.
 
 Invoice totals are computed as the sum of:
+
 - `SUM(volume_litres × price_eur_cents)` over all non-air `fill_event_gas_fill` rows, joined back through the frozen `gas_price_id`
 - `SUM(price_eur_cents)` over all `fill_event_diluent_fill` rows
 
@@ -137,15 +138,15 @@ This means invoiced amounts always reflect the price at the time of the fill, re
 
 ## Invariants
 
-| Invariant | Where enforced |
-| --- | --- |
-| One current price per gas at any time | Application code (assert on SELECT, guard on INSERT) + `UNIQUE (gas_id, active_from)` index |
-| At most one future price per gas | 409 guard in `createGasPrice` + assert in `getFuturePriceForGas` + `UNIQUE (gas_id, active_to)` index (two open-ended rows for the same gas are impossible) |
-| Every gas always has a current price | Initial migration inserts zero-priced rows for all gases |
-| Price is frozen at fill time | FK `fill_event_gas_fill.gas_price_id → gas_price.id` |
-| Client/server price agreement | Total cost recalculated server-side, compared to client's submitted price |
-| `active_to > active_from` | DB check constraint |
-| All times are UTC | `timezone: 'Z'` in Knex connection config |
+| Invariant                             | Where enforced                                                                                                                                              |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One current price per gas at any time | Application code (assert on SELECT, guard on INSERT) + `UNIQUE (gas_id, active_from)` index                                                                 |
+| At most one future price per gas      | 409 guard in `createGasPrice` + assert in `getFuturePriceForGas` + `UNIQUE (gas_id, active_to)` index (two open-ended rows for the same gas are impossible) |
+| Every gas always has a current price  | Initial migration inserts zero-priced rows for all gases                                                                                                    |
+| Price is frozen at fill time          | FK `fill_event_gas_fill.gas_price_id → gas_price.id`                                                                                                        |
+| Client/server price agreement         | Total cost recalculated server-side, compared to client's submitted price                                                                                   |
+| `active_to > active_from`             | DB check constraint                                                                                                                                         |
+| All times are UTC                     | `timezone: 'Z'` in Knex connection config                                                                                                                   |
 
 ---
 
@@ -157,4 +158,4 @@ This is an accepted limitation: only users with blender privileges (`isBlender`,
 
 Air's `gas_price` row exists in the DB but its price value is intentionally ignored everywhere. To prevent confusion, the admin UI hides the edit button for Air rows, and the backend rejects `POST /api/gas/price` requests for Air with a 400.
 
-Diluent's `gas_price` row likewise exists but is never used for cost calculation — diluent price is always derived from the O2 and He prices. The admin UI hides the edit button for Diluent rows, and the backend rejects `POST /api/gas/price` requests for Diluent with a 400. The `getDiluentPrice` query (`GET /api/gas/diluent-price`) validates that the supplied storage cylinder is actually a Diluent cylinder before returning a price.
+Diluent's `gas_price` row likewise exists but is never used for cost calculation — diluent price is always derived from the Helium price only (oxygen is not charged). The admin UI hides the edit button for Diluent rows, and the backend rejects `POST /api/gas/price` requests for Diluent with a 400. `createFillEvent` validates that the supplied storage cylinder is actually a Diluent cylinder before computing its cost.

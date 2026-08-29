@@ -1,10 +1,12 @@
 import { type DivingCylinderSet } from '../../../interfaces/DivingCylinderSet';
 import { DropdownMenu, TextInput } from '../../common/Inputs';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Form } from 'react-bootstrap';
 import {
   AvailableGasses,
   AvailableMixtureCompositions,
+  AvailableMixtures,
+  mapMixtureToLabel,
 } from '../../../lib/utils';
 import { type CommonTileProps } from '../BlenderLogbook';
 import { type Compressor } from '../../../lib/queries/compressorQuery';
@@ -26,9 +28,43 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
 }) => {
   const { setFieldValue } = useFormikContext();
   const [showClubCylinders, setShowClubCylinders] = useState(false);
+  const [compressorUsed, setCompressorUsed] = useState(true);
 
-  const orderedCylinderSets = divingCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const selectedMixture = AvailableMixtureCompositions.find(
+    (m) => m.id === values.gasMixture,
+  );
+  const isArgonSelected = values.gasMixture === AvailableMixtures.Argon;
+  // A compressor can never be linked to an Argon fill, regardless of what the user picked.
+  const effectiveCompressorUsed = isArgonSelected ? false : compressorUsed;
+
+  useEffect(() => {
+    if (!selectedMixture?.fixedComposition) return;
+    void setFieldValue(
+      'oxygenPercentage',
+      selectedMixture.fixedComposition.oxygenPercentage,
+    );
+    void setFieldValue(
+      'heliumPercentage',
+      selectedMixture.fixedComposition.heliumPercentage,
+    );
+  }, [selectedMixture, setFieldValue]);
+
+  // TODO: there is currently only one continuous-flow compressor, so it's
+  // auto-linked without asking the user which one. If a club ever configures
+  // more than one, replace this with a compressor picker.
+  useEffect(() => {
+    void setFieldValue(
+      'compressorId',
+      effectiveCompressorUsed ? compressors[0]?.id ?? '' : '',
+    );
+  }, [effectiveCompressorUsed, compressors, setFieldValue]);
+
+  const orderedCylinderSets = divingCylinderSets.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
+  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
 
   const toOption = (dcs: DivingCylinderSet, allSets: DivingCylinderSet[]) => ({
     value: dcs.id,
@@ -49,7 +85,9 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
       ? [
           {
             groupLabel: 'Seuran pullot',
-            options: orderedClubCylinderSets.map((dcs) => toOption(dcs, allSets)),
+            options: orderedClubCylinderSets.map((dcs) =>
+              toOption(dcs, allSets),
+            ),
           },
         ]
       : []),
@@ -78,26 +116,31 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
             label="Pullosetti"
             optionGroups={optionGroups}
             selectedValues={values.divingCylinderSetIds}
-            onChange={(next) => { void setFieldValue('divingCylinderSetIds', next); }}
+            onChange={(next) => {
+              void setFieldValue('divingCylinderSetIds', next);
+            }}
             disabled={values.userConfirm}
-            errorText={errors.divingCylinderSetIds ? String(errors.divingCylinderSetIds) : undefined}
+            errorText={
+              errors.divingCylinderSetIds
+                ? String(errors.divingCylinderSetIds)
+                : undefined
+            }
             style={{ minWidth: '180px' }}
           />
-          <DropdownMenu
-            name="compressorId"
-            label="Kompressori"
-            disabled={values.userConfirm}
-            errorText={errors.compressorId}
-          >
-            {compressors.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-            <option key="empty" value="">
-              Ei kompressoria (tyhjä)
-            </option>
-          </DropdownMenu>
+          <div className="inputField">
+            <label className="field-title" htmlFor="compressor-used">
+              Käynnistyikö kompura täytön aikana?
+            </label>
+            <Form.Select
+              id="compressor-used"
+              value={effectiveCompressorUsed ? 'yes' : 'no'}
+              disabled={values.userConfirm || isArgonSelected}
+              onChange={(e) => setCompressorUsed(e.target.value === 'yes')}
+            >
+              <option value="yes">Kyllä</option>
+              <option value="no">Ei</option>
+            </Form.Select>
+          </div>
           <TextInput
             disabled={values.userConfirm}
             errorText={errors.additionalInformation}
@@ -108,13 +151,20 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
 
         <div className="d-flex gap-3 flex-wrap">
           <DropdownMenu
-            disabled={values.userConfirm}
+            disabled={
+              values.userConfirm || values.diluentFillingRows.length > 0
+            }
             name="gasMixture"
             label="Kaasuseos"
+            tooltip={
+              !values.userConfirm && values.diluentFillingRows.length > 0
+                ? 'Diluenttitäyttö lisätty, kaasuseos on aina TRIMIX'
+                : undefined
+            }
           >
             {AvailableMixtureCompositions.map((mix) => (
               <option key={mix.id} value={mix.id}>
-                {mix.id}
+                {mapMixtureToLabel(mix.id)}
               </option>
             ))}
           </DropdownMenu>
@@ -122,9 +172,9 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
           <TextInput
             disabled={
               values.userConfirm ||
-              AvailableMixtureCompositions.find(
-                (m) => m.id === values.gasMixture,
-              )?.components.includes(AvailableGasses.oxygen) === false
+              !!selectedMixture?.fixedComposition ||
+              selectedMixture?.components.includes(AvailableGasses.oxygen) ===
+                false
             }
             errorText={errors.oxygenPercentage}
             label="Happi %"
@@ -134,9 +184,9 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
           <TextInput
             disabled={
               values.userConfirm ||
-              AvailableMixtureCompositions.find(
-                (m) => m.id === values.gasMixture,
-              )?.components.includes(AvailableGasses.helium) === false
+              !!selectedMixture?.fixedComposition ||
+              selectedMixture?.components.includes(AvailableGasses.helium) ===
+                false
             }
             errorText={errors.heliumPercentage}
             label="Helium %"
