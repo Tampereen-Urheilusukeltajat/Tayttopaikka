@@ -12,8 +12,8 @@ export enum AvailableGasses {
 export enum AvailableMixtures {
   Nitrox = 'Nitrox',
   Trimix = 'Trimix',
-  Heliox = 'Heliox',
   Argon = 'Argon',
+  Oxygen = 'Oxygen',
 }
 
 export const AvailableMixtureCompositions = [
@@ -26,14 +26,37 @@ export const AvailableMixtureCompositions = [
     components: [AvailableGasses.oxygen, AvailableGasses.helium],
   },
   {
-    id: AvailableMixtures.Heliox,
-    components: [AvailableGasses.oxygen, AvailableGasses.helium],
-  },
-  {
     id: AvailableMixtures.Argon,
     components: [AvailableGasses.argon],
+    fixedComposition: { oxygenPercentage: '0', heliumPercentage: '0' },
+  },
+  {
+    id: AvailableMixtures.Oxygen,
+    components: [AvailableGasses.oxygen],
+    fixedComposition: { oxygenPercentage: '100', heliumPercentage: '0' },
   },
 ];
+
+/** Display label for the gas mixture dropdown. */
+export const mapMixtureToLabel = (mixture: AvailableMixtures): string => {
+  switch (mixture) {
+    case AvailableMixtures.Oxygen:
+      return 'Happi';
+    default:
+      return mixture;
+  }
+};
+
+/** Storage cylinder gas content allowed for each mixture in the main filling tile. */
+export const AvailableMixtureAllowedGasses: Record<
+  AvailableMixtures,
+  AvailableGasses[]
+> = {
+  [AvailableMixtures.Nitrox]: [AvailableGasses.oxygen],
+  [AvailableMixtures.Oxygen]: [AvailableGasses.oxygen],
+  [AvailableMixtures.Argon]: [AvailableGasses.argon],
+  [AvailableMixtures.Trimix]: [AvailableGasses.oxygen, AvailableGasses.helium],
+};
 
 export const formalizeGasMixture = (
   gasMixture: AvailableMixtures,
@@ -43,8 +66,8 @@ export const formalizeGasMixture = (
   switch (gasMixture) {
     case AvailableMixtures.Argon:
       return 'Argon';
-    case AvailableMixtures.Heliox:
-      return `Heliox ${heliumPercentage}/${oxygenPercentage}`;
+    case AvailableMixtures.Oxygen:
+      return 'O2 100%';
     case AvailableMixtures.Nitrox:
       return `EAN${oxygenPercentage}`;
     case AvailableMixtures.Trimix:

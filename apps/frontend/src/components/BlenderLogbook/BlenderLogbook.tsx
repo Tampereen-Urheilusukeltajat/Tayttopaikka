@@ -8,13 +8,11 @@ import { Form, Formik, type FormikHelpers } from 'formik';
 import { BasicInfoTile } from './components/BasicInfoTile';
 import { PricingTile } from './components/PricingTile';
 import { FillingTile } from './components/FillingTile';
-import {
-  DiluentFillingTile,
-} from './components/DiluentFillingTile';
+import { DiluentFillingTile } from './components/DiluentFillingTile';
 import { SavingTile } from './components/SavingTile';
 import {
   AvailableGasses,
-  AvailableMixtureCompositions,
+  AvailableMixtureAllowedGasses,
   AvailableMixtures,
   formalizeGasMixture,
 } from '../../lib/utils';
@@ -86,7 +84,8 @@ const computeTotalFillCostCents = (
   const gasCostsCents = fillingEventRows.map((row) => {
     const cyl = storageCylinders.find((sc) => sc.id === row.storageCylinderId);
     if (!cyl) return 0;
-    const priceCents = gases.find((g) => g.gasId === cyl.gasId)?.priceEurCents ?? 0;
+    const priceCents =
+      gases.find((g) => g.gasId === cyl.gasId)?.priceEurCents ?? 0;
     return calcGasFillCostCents(
       calculateVolumeLitres(cyl.volume, row.startPressure, row.endPressure),
       priceCents,
@@ -105,7 +104,7 @@ const computeTotalFillCostCents = (
       hePriceCents,
     );
   });
-  
+
   return calcTotalFillCostCents(gasCostsCents, diluentCostsCents);
 };
 
@@ -114,10 +113,24 @@ const EMPTY_FILLING_EVENT_BASIC_INFO: FillingEventBasicInfo = {
   additionalInformation: '',
   divingCylinderSetIds: [],
   heliumPercentage: '0',
-  gasMixture: AvailableMixtureCompositions[0].id,
+  gasMixture: AvailableMixtures.Nitrox,
   oxygenPercentage: '21',
   userConfirm: false,
   compressorId: '',
+};
+
+const filterStorageCylindersByMixture = (
+  cylinders: StorageCylinder[],
+  gasMixture: AvailableMixtures,
+  gases: GasWithPricing[],
+): StorageCylinder[] => {
+  const allowedGasNames = AvailableMixtureAllowedGasses[gasMixture] ?? [];
+  const allowedGasIds = new Set(
+    gases
+      .filter((g) => allowedGasNames.includes(g.gasName))
+      .map((g) => g.gasId),
+  );
+  return cylinders.filter((sc) => allowedGasIds.has(sc.gasId));
 };
 
 export const emptyFillingRow = (startPressure = 0): FillingEventRow => ({
@@ -161,9 +174,15 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
   gases,
   storageCylinders,
 }) => {
-  const diluentGasId = gases.find((g) => g.gasName === AvailableGasses.diluent)?.gasId;
-  const diluentCylinders = storageCylinders.filter((sc) => sc.gasId === diluentGasId);
-  const regularStorageCylinders = storageCylinders.filter((sc) => sc.gasId !== diluentGasId);
+  const diluentGasId = gases.find(
+    (g) => g.gasName === AvailableGasses.diluent,
+  )?.gasId;
+  const diluentCylinders = storageCylinders.filter(
+    (sc) => sc.gasId === diluentGasId,
+  );
+  const regularStorageCylinders = storageCylinders.filter(
+    (sc) => sc.gasId !== diluentGasId,
+  );
   const fillEventMutation = useMutation({
     mutationFn: async (payload: NewFillEvent) => postFillEvent(payload),
     onError: () => {
@@ -238,18 +257,15 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
       <h1 className="pb-4">Luo uusi täyttötapahtuma</h1>
 
       <Formik
-        initialValues={{
-          ...EMPTY_FILLING_EVENT_BASIC_INFO,
-          divingCylinderSetIds: [] as string[],
-          compressorId: compressors[0].id ?? '',
-          diluentFillingRows: [] as DiluentFillingRow[],
-          fillingEventRows: [
-            {
-              ...emptyFillingRow(),
-              storageCylinderId: regularStorageCylinders[0]?.id ?? '',
-            },
-          ],
-        } satisfies FormFields}
+        initialValues={
+          {
+            ...EMPTY_FILLING_EVENT_BASIC_INFO,
+            divingCylinderSetIds: [] as string[],
+            compressorId: '',
+            diluentFillingRows: [] as DiluentFillingRow[],
+            fillingEventRows: [] as FillingEventRow[],
+          } satisfies FormFields
+        }
         validateOnBlur={false}
         validateOnChange={false}
         validationSchema={BLENDER_FILLING_EVENT_VALIDATION_SCHEMA}
@@ -265,14 +281,24 @@ export const NewBlenderFillingEvent: React.FC<NewFillingEventProps> = ({
                 errors={errors}
                 values={values}
               />
-              <PricingTile errors={errors} gases={gases.filter((g) => g.gasName !== AvailableGasses.diluent)} values={values} />
+              <PricingTile
+                errors={errors}
+                gases={gases.filter(
+                  (g) => g.gasName !== AvailableGasses.diluent,
+                )}
+                values={values}
+              />
             </div>
 
             <FillingTile
               setFieldValue={setFieldValue}
               errors={errors}
               values={values}
-              storageCylinders={regularStorageCylinders}
+              storageCylinders={filterStorageCylindersByMixture(
+                regularStorageCylinders,
+                values.gasMixture,
+                gases,
+              )}
               gases={gases}
             />
 

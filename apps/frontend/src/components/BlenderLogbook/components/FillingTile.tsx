@@ -181,7 +181,7 @@ export const FillingTile: React.FC<FillingTileProps> = ({
 }) => {
   return (
     <div className="pt-3 pb-3 border-bottom">
-      <h2>Täyttö</h2>
+      <h2>Täyttö varastopulloista</h2>
       <FieldArray name="fillingEventRows">
         {({ remove, push }) => (
           <>
@@ -206,7 +206,7 @@ export const FillingTile: React.FC<FillingTileProps> = ({
                   });
                 }}
                 type={ButtonType.button}
-                text="Lisää uusi rivi"
+                text="Lisää uusi varastopullo"
               />
             </div>
           </>

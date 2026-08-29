@@ -1,15 +1,22 @@
 import { type DivingCylinderSet } from '../../../interfaces/DivingCylinderSet';
 import { DropdownMenu, TextInput } from '../../common/Inputs';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Form } from 'react-bootstrap';
 import {
   AvailableGasses,
   AvailableMixtureCompositions,
+  AvailableMixtures,
+  mapMixtureToLabel,
 } from '../../../lib/utils';
 import { type CommonTileProps } from '../BlenderLogbook';
 import { type Compressor } from '../../../lib/queries/compressorQuery';
 import { useFormikContext } from 'formik';
 import { ChipSelect } from '../../common/ChipSelect';
+
+enum FillingMethod {
+  PartialPressure = 'partial',
+  ContinuousFlow = 'continuous',
+}
 
 type BasicInfoTileProps = CommonTileProps & {
   divingCylinderSets: DivingCylinderSet[];
@@ -26,9 +33,49 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
 }) => {
   const { setFieldValue } = useFormikContext();
   const [showClubCylinders, setShowClubCylinders] = useState(false);
+  const [fillingMethod, setFillingMethod] = useState<FillingMethod>(
+    FillingMethod.ContinuousFlow,
+  );
 
-  const orderedCylinderSets = divingCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const selectedMixture = AvailableMixtureCompositions.find(
+    (m) => m.id === values.gasMixture,
+  );
+  const isArgonSelected = values.gasMixture === AvailableMixtures.Argon;
+  // Argon is always filled by partial pressure, regardless of the last method the user picked.
+  const effectiveFillingMethod = isArgonSelected
+    ? FillingMethod.PartialPressure
+    : fillingMethod;
+
+  useEffect(() => {
+    if (!selectedMixture?.fixedComposition) return;
+    void setFieldValue(
+      'oxygenPercentage',
+      selectedMixture.fixedComposition.oxygenPercentage,
+    );
+    void setFieldValue(
+      'heliumPercentage',
+      selectedMixture.fixedComposition.heliumPercentage,
+    );
+  }, [selectedMixture, setFieldValue]);
+
+  // TODO: there is currently only one continuous-flow compressor, so it's
+  // auto-selected without asking the user. If a club ever configures more
+  // than one, replace this with a compressor picker.
+  useEffect(() => {
+    void setFieldValue(
+      'compressorId',
+      effectiveFillingMethod === FillingMethod.ContinuousFlow
+        ? compressors[0]?.id ?? ''
+        : '',
+    );
+  }, [effectiveFillingMethod, compressors, setFieldValue]);
+
+  const orderedCylinderSets = divingCylinderSets.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
+  const orderedClubCylinderSets = clubCylinderSets.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
 
   const toOption = (dcs: DivingCylinderSet, allSets: DivingCylinderSet[]) => ({
     value: dcs.id,
@@ -49,7 +96,9 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
       ? [
           {
             groupLabel: 'Seuran pullot',
-            options: orderedClubCylinderSets.map((dcs) => toOption(dcs, allSets)),
+            options: orderedClubCylinderSets.map((dcs) =>
+              toOption(dcs, allSets),
+            ),
           },
         ]
       : []),
@@ -78,26 +127,36 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
             label="Pullosetti"
             optionGroups={optionGroups}
             selectedValues={values.divingCylinderSetIds}
-            onChange={(next) => { void setFieldValue('divingCylinderSetIds', next); }}
+            onChange={(next) => {
+              void setFieldValue('divingCylinderSetIds', next);
+            }}
             disabled={values.userConfirm}
-            errorText={errors.divingCylinderSetIds ? String(errors.divingCylinderSetIds) : undefined}
+            errorText={
+              errors.divingCylinderSetIds
+                ? String(errors.divingCylinderSetIds)
+                : undefined
+            }
             style={{ minWidth: '180px' }}
           />
-          <DropdownMenu
-            name="compressorId"
-            label="Kompressori"
-            disabled={values.userConfirm}
-            errorText={errors.compressorId}
-          >
-            {compressors.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-            <option key="empty" value="">
-              Ei kompressoria (tyhjä)
-            </option>
-          </DropdownMenu>
+          <div className="d-flex flex-column gap-1">
+            <span className="field-title">Täyttötapa</span>
+            <Form.Check
+              type="radio"
+              id="filling-method-continuous"
+              label="Jatkuvan virtauksen täyttö"
+              checked={effectiveFillingMethod === FillingMethod.ContinuousFlow}
+              disabled={values.userConfirm || isArgonSelected}
+              onChange={() => setFillingMethod(FillingMethod.ContinuousFlow)}
+            />
+            <Form.Check
+              type="radio"
+              id="filling-method-partial"
+              label="Osapainetäyttö"
+              checked={effectiveFillingMethod === FillingMethod.PartialPressure}
+              disabled={values.userConfirm}
+              onChange={() => setFillingMethod(FillingMethod.PartialPressure)}
+            />
+          </div>
           <TextInput
             disabled={values.userConfirm}
             errorText={errors.additionalInformation}
@@ -108,13 +167,20 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
 
         <div className="d-flex gap-3 flex-wrap">
           <DropdownMenu
-            disabled={values.userConfirm}
+            disabled={
+              values.userConfirm || values.diluentFillingRows.length > 0
+            }
             name="gasMixture"
             label="Kaasuseos"
+            tooltip={
+              !values.userConfirm && values.diluentFillingRows.length > 0
+                ? 'Diluenttitäyttö lisätty, kaasuseos on aina TRIMIX'
+                : undefined
+            }
           >
             {AvailableMixtureCompositions.map((mix) => (
               <option key={mix.id} value={mix.id}>
-                {mix.id}
+                {mapMixtureToLabel(mix.id)}
               </option>
             ))}
           </DropdownMenu>
@@ -122,9 +188,9 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
           <TextInput
             disabled={
               values.userConfirm ||
-              AvailableMixtureCompositions.find(
-                (m) => m.id === values.gasMixture,
-              )?.components.includes(AvailableGasses.oxygen) === false
+              !!selectedMixture?.fixedComposition ||
+              selectedMixture?.components.includes(AvailableGasses.oxygen) ===
+                false
             }
             errorText={errors.oxygenPercentage}
             label="Happi %"
@@ -134,9 +200,9 @@ export const BasicInfoTile: React.FC<BasicInfoTileProps> = ({
           <TextInput
             disabled={
               values.userConfirm ||
-              AvailableMixtureCompositions.find(
-                (m) => m.id === values.gasMixture,
-              )?.components.includes(AvailableGasses.helium) === false
+              !!selectedMixture?.fixedComposition ||
+              selectedMixture?.components.includes(AvailableGasses.helium) ===
+                false
             }
             errorText={errors.heliumPercentage}
             label="Helium %"

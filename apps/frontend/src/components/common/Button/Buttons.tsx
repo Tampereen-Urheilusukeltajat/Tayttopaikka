@@ -60,25 +60,42 @@ export const ElementButton: React.FC<ElementButtonProps> = ({
   );
 };
 
-export const PrimaryButton: React.FC<TextButtonProps> = ({
+export type PrimaryButtonProps = TextButtonProps & {
+  tooltip?: string;
+};
+
+export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   disabled,
   key,
   onClick,
   id,
   text,
+  tooltip,
   type = ButtonType.button,
-}) => (
-  <button
-    id={id}
-    className={`${styles.commonButton} ${styles.primaryButton}`}
-    disabled={disabled}
-    key={key}
-    onClick={onClick}
-    type={type}
-  >
-    {text}
-  </button>
-);
+}) => {
+  const tooltipId = useMemo(
+    () => (tooltip ? crypto.randomUUID() : ''),
+    [tooltip],
+  );
+
+  return (
+    <>
+      <button
+        id={id}
+        className={`${styles.commonButton} ${styles.primaryButton}`}
+        data-tooltip-id={tooltipId}
+        data-tooltip-content={tooltip}
+        disabled={disabled}
+        key={key}
+        onClick={onClick}
+        type={type}
+      >
+        {text}
+      </button>
+      {tooltip && <Tooltip id={tooltipId} />}
+    </>
+  );
+};
 
 export const SecondaryButton: React.FC<TextButtonProps> = ({
   disabled,
