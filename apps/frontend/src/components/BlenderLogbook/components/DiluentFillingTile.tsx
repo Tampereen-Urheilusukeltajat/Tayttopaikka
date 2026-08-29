@@ -98,7 +98,8 @@ const DiluentRowComponent: React.FC<DiluentRowProps> = ({
       : 0;
 
   const hePct = Number(row?.heliumPercentage ?? 0);
-  const heVolumeLitres = (hePct / 100) * totalVolumeLitres;
+  const rawHeVolumeLitres = (hePct / 100) * totalVolumeLitres;
+  const heVolumeLitres = Math.ceil(parseFloat(rawHeVolumeLitres.toFixed(10)));
 
   const priceEur = row
     ? calcDiluentRowPriceEur(row, cylinder, hePriceCents)
