@@ -1,4 +1,4 @@
-FROM node:24.12.0-alpine AS build
+FROM node:26.8.1-alpine AS build
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
@@ -20,6 +20,6 @@ RUN pnpm --filter @tayttopaikka/pricing build
 RUN NODE_ENV=production pnpm --filter @tayttopaikka/frontend build
 
 # Serve app with nginx
-FROM nginx:1.25.1
+FROM nginx:1.31.0
 COPY apps/frontend/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/apps/frontend/dist /usr/share/nginx/html
