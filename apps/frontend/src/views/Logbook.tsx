@@ -18,8 +18,11 @@ export const Logbook = (): JSX.Element => {
   const { data: clubCylinderSets } = useClubCylinderQuery();
 
   const anyErrors = isDivingCylindersError || isError;
+  const hasFillableCylinderSets =
+    (divingCylinderSets?.length ?? 0) > 0 ||
+    (clubCylinderSets?.length ?? 0) > 0;
   const requiredDataLoaded =
-    (allCompressors?.length ?? 0) > 0 && (divingCylinderSets?.length ?? 0) > 0;
+    (allCompressors?.length ?? 0) > 0 && hasFillableCylinderSets;
 
   return (
     <>
@@ -29,7 +32,7 @@ export const Logbook = (): JSX.Element => {
           uudestaan.
         </div>
       )}
-      {(!divingCylinderSets || divingCylinderSets.length < 1) && (
+      {!hasFillableCylinderSets && (
         <div>
           Sinulla ei ole järjestelmään merkittyä omaa pullosettiä, jota voisi
           täyttää.
