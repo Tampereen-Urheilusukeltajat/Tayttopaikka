@@ -24,16 +24,19 @@ export const BlenderLogbook = (): JSX.Element => {
     [allCompressors],
   );
 
+  const hasFillableCylinderSets =
+    (divingCylinderSets?.length ?? 0) > 0 ||
+    (clubCylinderSets?.length ?? 0) > 0;
+
   const requiredDataLoaded = useMemo(
     () =>
       (storageCylinders &&
         storageCylinders.length > 0 &&
         gases &&
         gases.length > 0 &&
-        divingCylinderSets &&
-        divingCylinderSets.length > 0) ??
+        hasFillableCylinderSets) ??
       false,
-    [divingCylinderSets, gases, storageCylinders],
+    [gases, hasFillableCylinderSets, storageCylinders],
   );
 
   const anyErrors = useMemo(
@@ -58,7 +61,7 @@ export const BlenderLogbook = (): JSX.Element => {
           uudestaan.
         </div>
       )}
-      {(!divingCylinderSets || divingCylinderSets.length < 1) && (
+      {!hasFillableCylinderSets && (
         <div>
           Sinulla ei ole järjestelmään merkittyä omaa pullosettiä, jota voisi
           täyttää.
