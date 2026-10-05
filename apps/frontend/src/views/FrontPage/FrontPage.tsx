@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { BsArrowLeftCircle } from 'react-icons/bs';
 import Tayttopaikka from '../../svg/tayttopaikka.svg?react';
 import D12 from '../../svg/D12.svg?react';
@@ -7,11 +7,8 @@ import styles from './FrontPage.module.scss';
 import { Container } from 'react-bootstrap';
 
 export const FrontPage: React.FC = () => {
-  const [showBackButton, setShowBackButton] = useState(false);
   const location = useLocation();
-  useEffect(() => {
-    setShowBackButton(location.pathname !== '/login');
-  }, [location]);
+  const showBackButton = location.pathname !== '/login';
 
   return (
     <Container className="pt-4">
