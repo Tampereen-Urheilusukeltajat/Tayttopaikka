@@ -6,7 +6,11 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { CommonTableV2 } from '../../components/common/Table/CommonTable-v2';
-import { type Invoice, useInvoiceQuery } from '../../lib/queries/invoiceQuery';
+import {
+  type Invoice,
+  useInvoiceQuery,
+  useInvoiceGasBreakdownQuery,
+} from '../../lib/queries/invoiceQuery';
 import { format } from 'date-fns';
 import { PrimaryButton } from '../../components/common/Button/Buttons';
 import { utils, writeFileXLSX } from 'xlsx';
@@ -14,6 +18,7 @@ import { Modal } from '../../components/common/Modal/Modal';
 import { toast } from 'react-toastify';
 import { useInvoicePaymentEventsMutation } from '../../lib/queries/invoicePaymentEventMutation';
 import { eurCentsToEur } from '@tayttopaikka/pricing';
+import { InvoiceStats } from '../../components/Invoice/InvoiceStats';
 
 type InvoiceTableRow = {
   name: string | null;
@@ -58,6 +63,7 @@ export const InvoicePage: React.FC = () => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [exportedData, setExportedData] = useState<Invoice[]>([]);
   const { data } = useInvoiceQuery();
+  const { data: gasBreakdown } = useInvoiceGasBreakdownQuery();
 
   const onMutationSuccess = useCallback(() => {
     setIsConfirmModalOpen(false);
@@ -215,6 +221,7 @@ export const InvoicePage: React.FC = () => {
           <a href="mailto:info@tayttopaikka.fi">info@tayttopaikka.fi</a>.
         </p>
       </div>
+      <InvoiceStats invoices={data ?? []} gasBreakdown={gasBreakdown ?? []} />
       <div>
         <div className="d-flex flex-row justify-content-between pb-2">
           <h2>Laskuttamattomat täyttötapahtumat</h2>

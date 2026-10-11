@@ -1,9 +1,17 @@
 import { type PaymentEvent } from '../queries/invoicePaymentEventMutation';
-import { type Invoice } from '../queries/invoiceQuery';
+import { type Invoice, type GasBreakdownRow } from '../queries/invoiceQuery';
 import { authGetAsync, authPostAsync } from './api';
 
 export const getInvoices = async (): Promise<Invoice[]> => {
   const response = await authGetAsync<Invoice[]>('/api/invoicing');
+
+  return response.data;
+};
+
+export const getInvoiceGasBreakdown = async (): Promise<GasBreakdownRow[]> => {
+  const response = await authGetAsync<GasBreakdownRow[]>(
+    '/api/invoicing/gas-breakdown',
+  );
 
   return response.data;
 };

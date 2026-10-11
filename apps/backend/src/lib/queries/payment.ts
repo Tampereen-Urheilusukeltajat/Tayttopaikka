@@ -1,7 +1,10 @@
 import { type Knex } from 'knex';
 import { knexController } from '../../database/database';
 import { type DBResponse } from '../../types/general.types';
-import { type InvoiceRow } from '../../types/invoices.types';
+import {
+  type InvoiceRow,
+  type GasBreakdownRow,
+} from '../../types/invoices.types';
 import { type PaymentEvent, PaymentStatus } from '../../types/payment.types';
 
 /**
@@ -94,6 +97,87 @@ export const getUnpaidFillEvents = async (
     description: v.fill_event_description,
     gasMixture: v.fill_event_gas_mixture,
     price: v.price,
+  }));
+};
+
+/**
+ * Get pending (unpaid) revenue grouped by gas type, across all users.
+ * Air is always excluded since it is never charged for.
+ */
+export const getPendingGasCostBreakdown = async (): Promise<
+  GasBreakdownRow[]
+> => {
+  const [rows] = await knexController.raw<
+    DBResponse<
+      Array<{
+        gas_id: number;
+        gas_name: string;
+        price_eur_cents: number;
+      }>
+    >
+  >(
+    `
+    WITH unpaid_fill_events AS (
+      SELECT DISTINCT fe.id AS fill_event_id
+      FROM fill_event fe
+      LEFT JOIN fill_event_payment_event fepe ON fepe.fill_event_id = fe.id
+      LEFT JOIN payment_event pe ON pe.id = fepe.payment_event_id
+      WHERE
+        NOT EXISTS (
+          SELECT
+            fepe2.fill_event_id
+          FROM fill_event_payment_event fepe2
+          JOIN payment_event pe2 ON
+            pe2.id = fepe2.payment_event_id AND
+            pe2.status = "COMPLETED"
+          WHERE
+            fepe2.fill_event_id = fe.id
+        )
+        AND (
+          fepe.fill_event_id IS NULL OR
+          pe.status = "FAILED"
+        )
+    ),
+    gas_component_price AS (
+      SELECT
+        gp.gas_id AS gas_id,
+        fegf.volume_litres * CAST(gp.price_eur_cents AS DECIMAL(12,2)) AS price_eur_cents
+      FROM fill_event_gas_fill fegf
+      JOIN gas_price gp ON gp.id = fegf.gas_price_id
+      JOIN unpaid_fill_events ufe ON ufe.fill_event_id = fegf.fill_event_id
+      WHERE fegf.storage_cylinder_id IS NOT NULL
+    ),
+    diluent_component_price AS (
+      SELECT
+        (SELECT id FROM gas WHERE name = "Diluent") AS gas_id,
+        fedf.price_eur_cents AS price_eur_cents
+      FROM fill_event_diluent_fill fedf
+      JOIN unpaid_fill_events ufe ON ufe.fill_event_id = fedf.fill_event_id
+    ),
+    combined_price AS (
+      SELECT * FROM gas_component_price
+      UNION ALL
+      SELECT * FROM diluent_component_price
+    )
+    SELECT
+      gas.id AS gas_id,
+      gas.name AS gas_name,
+      CEIL(SUM(combined_price.price_eur_cents)) AS price_eur_cents
+    FROM gas
+    JOIN combined_price ON combined_price.gas_id = gas.id
+    WHERE gas.name != "Air"
+    GROUP BY gas.id, gas.name
+    HAVING SUM(combined_price.price_eur_cents) > 0
+    ORDER BY gas.id
+  `,
+  );
+
+  if (!rows || rows.length === 0) return [];
+
+  return rows.map((v) => ({
+    gasId: v.gas_id,
+    gasName: v.gas_name,
+    priceEurCents: v.price_eur_cents,
   }));
 };
 
