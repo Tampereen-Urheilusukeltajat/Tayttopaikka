@@ -52,7 +52,7 @@ export const InvoiceStats = ({
 
   return (
     <div className="pb-4">
-      <div className="row g-3 pb-3">
+      <div className="row g-3">
         <div className="col-md-4">
           <div className="card h-100">
             <div className="card-body">
@@ -116,18 +116,28 @@ export const InvoiceStats = ({
             </div>
           </div>
         </div>
-      </div>
-      {gasBreakdown.length > 0 && (
-        <div className={styles.content}>
-          <h2>Odottava hinnasto kaasuittain</h2>
-          {gasBreakdown.map((row) => (
-            <div key={row.gasId} className={styles.priceRow}>
-              <span>{mapGasToName(row.gasName as AvailableGasses)}:</span>
-              <span>{eurCentsToEur(row.priceEurCents)} €</span>
+        <div className="col-md-4">
+          <div className="card h-100">
+            <div className="card-body">
+              <h6 className="card-subtitle mb-2 text-muted">
+                Saatavat kaasuittain
+              </h6>
+              {gasBreakdown.length > 0 ? (
+                gasBreakdown.map((row) => (
+                  <div key={row.gasId} className={styles.priceRow}>
+                    <span>{mapGasToName(row.gasName as AvailableGasses)}:</span>
+                    <span>{eurCentsToEur(row.priceEurCents)} €</span>
+                  </div>
+                ))
+              ) : (
+                <p className="card-text text-muted small mb-0">
+                  Ei avoimia saldoja
+                </p>
+              )}
             </div>
-          ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
