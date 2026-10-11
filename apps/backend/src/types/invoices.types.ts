@@ -18,3 +18,11 @@ export const invoice = Type.Object({
 });
 
 export type Invoice = Static<typeof invoice>;
+
+export const gasBreakdownRow = Type.Object({
+  gasId: Type.Number(),
+  gasName: Type.String(),
+  priceEurCents: Type.Number({ minimum: 0 }),
+});
+
+export type GasBreakdownRow = Static<typeof gasBreakdownRow>;

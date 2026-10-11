@@ -1,0 +1,9 @@
+@use '../../variables.scss' as *;
+
+.priceRow {
+  display: flex;
+  border-bottom: 1px dotted $grey60;
+  flex: 1;
+  justify-content: space-between;
+  gap: 1rem;
+}
